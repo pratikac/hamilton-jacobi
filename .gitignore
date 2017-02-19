@@ -1,0 +1,18 @@
+*.py[cod]
+*.swp
+
+# Mac
+*.DS_Store
+
+# data
+*.pkl
+*.p
+
+# latex
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.synctex.gz
