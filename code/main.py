@@ -13,7 +13,8 @@ import numpy as np
 opt = add_args([
 ['-o', '/local2/pratikac/results', 'output'],
 ['-m', 'lenet', 'lenet | mnistfc | allcnn'],
-['--dataset', 'mnist', 'mnist | rotmnist | cifar10'],
+['--optim', 'EntropySGD', 'EntropySGD | EntropySGDControl | SGDPME'],
+['--dataset', 'mnist', 'mnist | rotmnist | cifar10 | cifar100'],
 ['--retrain', '', 'checkpoint'],
 ['-b', 128, 'batch_size'],
 ['--augment', False, 'data augmentation'],
@@ -26,7 +27,7 @@ opt = add_args([
 ['--g0', 0.03, 'gamma'],
 ['--g1', 0.0, 'scoping'],
 ['-s', 42, 'seed'],
-['-g', 1, 'gpu idx'],
+['-g', 0, 'gpu idx'],
 ['-l', False, 'log']
 ])
 if opt['L'] > 0:
@@ -45,7 +46,7 @@ cudnn.benchmark = True
 train_loader, val_loader, test_loader = getattr(loader, opt['dataset'])(opt)
 model = getattr(models, opt['m'])(opt).cuda()
 criterion = nn.CrossEntropyLoss().cuda()
-optimizer = optim.EntropySGDControl(model.parameters(),
+optimizer = getattr(optim, opt['optim'])(model.parameters(),
         config = dict(lr=opt['lr'], momentum=0.9, nesterov=True, weight_decay=opt['l2'],
         L=opt['L'], eps=opt['eps'], g0=opt['g0'], g1=opt['g1']))
 

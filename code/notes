@@ -1,4 +1,10 @@
-mnistconv:
+lenet:
     optimal control version
         g0 = 1e-3, g1 = 1e-4, L=10 works fine
             0.59 @ 3
+
+allcnn:
+    optimal control version
+        g0 = 0.03, g1 = 1e-4, L=20
+        lr_schedule '[[3,1],[6,0.2],[16,0.01]]'
+        12.02 @ 1, 10.46 @ 2, 9.876 @ 3, 9.43 @ 7

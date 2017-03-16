@@ -54,9 +54,6 @@ def mnist(opt):
     d1, d2 = datasets.MNIST('/local2/pratikac/mnist', train=True), \
             datasets.MNIST('/local2/pratikac/mnist', train=False)
 
-    # d1.train_data = (d1.train_data.float() - 126.)/126.
-    # d2.test_data = (d2.test_data.float() - 126.)/126.
-
     train = sampler_t(opt['b'], d1.train_data.view(-1,1,28,28).float(),
         d1.train_labels)
     val = sampler_t(opt['b'], d2.test_data.view(-1,1,28,28).float(),
@@ -96,7 +93,6 @@ def cifar100(opt):
     val = sampler_t(opt['b'], th.from_numpy(d2['data']),
                      th.from_numpy(d2['labels']), train=False)
     return train, val, val
-
 
 def imagenet(opt, only_train=False):
     loc = '/local2/pratikac/imagenet'
