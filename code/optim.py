@@ -383,7 +383,7 @@ class SGDPME(Optimizer):
         g0 = c['g0']
         g1 = c['g1']
         verbose = c['verbose']
-        m = 5
+        m = 2
 
         # only deal with the basic group?
         params = self.param_groups[0]['params']
@@ -418,14 +418,16 @@ class SGDPME(Optimizer):
             cf, cerr = closure()
             _, cdw = flatten_params(model)
 
-            tmp = cdw - state['dwc']
-            dw.add_((maxf-cf)**(m-1), tmp)
+            tmp = (cdw - state['dwc']).mul_((maxf-cf)**(m-1))
+            dw.add_(tmp)
 
-            if verbose:
-                print dw.norm(), cf, tmp.norm(), wcn, r.norm()
         dw.mul_(1/float(L*g*g)).add_(state['dwc'])
 
         if verbose:
+            debug = dict(dw=dw.norm(), dwc=state['dwc'].norm(),
+                dwdwc=th.dot(dw, state['dwc'])/dw.norm()/state['dwc'].norm(),
+                f=cf, wc=wcn)
+            print debug
             raw_input()
 
         if wd > 0:
