@@ -2,6 +2,8 @@ lenet:
     optimal control version
         g0 = 1e-3, g1 = 1e-4, L=10 works fine
             0.59 @ 3
+    PME
+        g0=5, L=25,
 
 allcnn:
     optimal control version

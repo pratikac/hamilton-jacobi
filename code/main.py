@@ -28,7 +28,8 @@ opt = add_args([
 ['--g1', 0.0, 'scoping'],
 ['-s', 42, 'seed'],
 ['-g', 0, 'gpu idx'],
-['-l', False, 'log']
+['-l', False, 'log'],
+['-v', False, 'Verbose']
 ])
 if opt['L'] > 0:
     opt['freq'] = 1
@@ -48,7 +49,7 @@ model = getattr(models, opt['m'])(opt).cuda()
 criterion = nn.CrossEntropyLoss().cuda()
 optimizer = getattr(optim, opt['optim'])(model.parameters(),
         config = dict(lr=opt['lr'], momentum=0.9, nesterov=True, weight_decay=opt['l2'],
-        L=opt['L'], eps=opt['eps'], g0=opt['g0'], g1=opt['g1']))
+        L=opt['L'], eps=opt['eps'], g0=opt['g0'], g1=opt['g1'], verbose=opt['v']))
 
 if not opt['retrain'] == '':
     ckpt = th.load(opt['retrain'])
