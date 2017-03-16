@@ -1,0 +1,4 @@
+mnistconv:
+    optimal control version
+        g0 = 1e-3, g1 = 1e-4, L=10 works fine
+            0.59 @ 3
