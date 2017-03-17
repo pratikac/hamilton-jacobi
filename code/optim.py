@@ -383,7 +383,9 @@ class SGDPME(Optimizer):
         g0 = c['g0']
         g1 = c['g1']
         verbose = c['verbose']
+
         m = 2
+        maxf = 3
 
         # only deal with the basic group?
         params = self.param_groups[0]['params']
@@ -403,32 +405,141 @@ class SGDPME(Optimizer):
         state['t'] += 1
         state['wc'].copy_(fw)
         state['dwc'].copy_(fdw)
-        wcn = state['wc'].norm()
+        wcn, dwcn = state['wc'].norm(), state['dwc'].norm()
 
         g = g0*(1+g1)**state['t']
-        g = g*wcn
+        h = np.sqrt(1./g)*dwcn
+        #dt = 1
+        #beta = L*dt/h**2      # this is the discretization
+        beta = 0.5
 
-        maxf = 3
         dw = state['dw'].mul_(0)
+        cf = 0
         for i in xrange(L):
-            r = state['eta'].normal_().mul_(1/np.sqrt(N))
+            fw.copy_(state['wc'])
 
-            fw.add_(g, r)
+            r = state['eta'].normal_().mul_(1/np.sqrt(N))
+            fw.add_(h, r)
             unflatten_params(model, fw)
             cf, cerr = closure()
             _, cdw = flatten_params(model)
 
-            tmp = (cdw - state['dwc']).mul_((maxf-cf)**(m-1))
-            dw.add_(tmp)
+            dw.add_(beta/float(L)*(maxf-cf)**(m-1), cdw)
 
-        dw.mul_(1/float(L*g*g)).add_(state['dwc'])
+        dw.add_(1 - beta*(maxf-mf)**(m-1), state['dwc'])
 
-        if verbose:
+        if verbose and state['t'] % 100 == 0:
             debug = dict(dw=dw.norm(), dwc=state['dwc'].norm(),
                 dwdwc=th.dot(dw, state['dwc'])/dw.norm()/state['dwc'].norm(),
-                f=cf, wc=wcn)
+                f=cf, wc=wcn,
+                beta=beta,
+                g=g,
+                h=h)
             print debug
-            raw_input()
+
+        if wd > 0:
+            dw.add_(wd, state['wc'])
+        if mom > 0:
+            state['mdw'].mul_(mom).add_(1-damp, dw)
+            if nesterov:
+                dw.add_(mom, state['mdw'])
+            else:
+                dw = state['mdw']
+
+        # update weights
+        fw = state['wc']
+
+        fw.add_(-lr, dw)
+        unflatten_params(model, fw)
+        mf,merr = closure()
+
+        return mf,merr
+
+class SGDFB(Optimizer):
+    def __init__(self, params, config = {}):
+
+        defaults = dict(lr=0.01, momentum=0, damp=0,
+                 weight_decay=0, nesterov=True,
+                 L=100, g0=1e-2, g1=0,
+                 verbose=False)
+        for k in defaults:
+            if config.get(k, None) is None:
+                config[k] = defaults[k]
+
+        super(SGDFB, self).__init__(params, config)
+        self.config = config
+
+    def step(self, closure=None, model=None, criterion=None):
+        assert (closure is not None) and (model is not None) and (criterion is not None), \
+                'attach closure for SGDPME, model and criterion'
+        mf,merr = closure()
+
+        c = self.config
+        lr = c['lr']
+        mom = c['momentum']
+        wd = c['weight_decay']
+        damp = c['damp']
+        nesterov = c['nesterov']
+        L = c['L']
+        g0 = c['g0']
+        g1 = c['g1']
+        verbose = c['verbose']
+
+        m = 2
+        maxf = 3
+
+        # only deal with the basic group?
+        params = self.param_groups[0]['params']
+        fw, fdw = flatten_params(model)
+        N = fw.numel()
+
+        state = self.state
+        # initialize
+        if not 't' in state:
+            state['t'] = 0
+            state['wc'] = deepcopy(fw)
+            state['dwc'] = deepcopy(fdw)
+            state['mdw'] = deepcopy(fdw)*0
+            state['p'] = deepcopy(fdw)*0
+
+        state['t'] += 1
+        state['wc'].copy_(fw)
+        state['dwc'].copy_(fdw)
+        wcn, dwcn = state['wc'].norm(), state['dwc'].norm()
+
+        g = g0*(1+g1)**state['t']
+        dt = g
+        llr = 0.1
+
+        state['p'].normal_().mul_(1/np.sqrt(N))*dwcn
+        cf = 0
+        p = state['p']
+        dw = fdw.zero_()
+        for i in xrange(int(L/2)):
+            fw.copy_(state['wc'])
+            fw.add_(dt, p)
+            unflatten_params(model, fw)
+            cf, cerr = closure()
+            _, cdw = flatten_params(model)
+            p.add_(llr, cdw)
+
+        for i in xrange(int(L/2)): 
+            fw.copy_(state['wc'])
+            fw.add_(-dt/2., p)
+            unflatten_params(model, fw)
+            cf, cerr = closure()
+            _, cdw = flatten_params(model)
+            p.add_(llr, cdw)
+
+        dw.zero_().add_(p)
+
+        if verbose and state['t'] % 100 == 0:
+            debug = dict(dw=dw.norm(), dwc=state['dwc'].norm(),
+                dwdwc=th.dot(dw, state['dwc'])/dw.norm()/state['dwc'].norm(),
+                f=cf, wc=wcn,
+                g=g,
+                dt=dt)
+            print debug
 
         if wd > 0:
             dw.add_(wd, state['wc'])
