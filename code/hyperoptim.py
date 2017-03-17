@@ -33,7 +33,7 @@ cmd = opt['command']
 params = json.loads(opt['params'])
 
 cmds = []
-gs = [1,2]
+gs = [0,1,2]
 keys,values = zip(*params.items())
 for v in product(*values):
     p = dict(zip(keys,v))
@@ -42,7 +42,7 @@ for v in product(*values):
         s += ' --'+k+' '+str(p[k])
 
     c = cmd+s
-    c = c + (' -f -l -g %d')%(gs[len(cmds)%len(gs)])
+    c = c + (' -l -g %d')%(gs[len(cmds)%len(gs)])
     cmds.append(c)
 
 if not opt['run']:

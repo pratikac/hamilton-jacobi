@@ -171,14 +171,15 @@ def val(e, data_loader):
     print((color('red', '**[%2d] %2.4f %2.4f%%\n'))%(e, fs.avg, top1.avg))
     print('')
 
-build_filename(opt, blacklist=['lr_schedule','retrain','step','ratio','freq'])
+build_filename(opt, blacklist=['lr_schedule','retrain','step', \
+                            'ratio','freq','v','dataset', 'augment', 'd'])
 create_logger(opt)
 
 for e in xrange(opt['B']):
     train(e)
     if e % opt['freq'] == opt['freq'] -1:
         val(e, val_loader)
-    save(model, opt)
+    #save(model, opt)
 
 # print(color('red', 'Test error: '))
 # val(e, test_loader)

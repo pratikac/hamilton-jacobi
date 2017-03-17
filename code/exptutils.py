@@ -39,7 +39,10 @@ def build_filename(opt, blacklist=[], marker=''):
     for k in blacklist:
         o.pop(k,None)
 
-    t = marker + '_' + time.strftime('(%b_%d_%H_%M_%S)') + '_opt_'
+    t = ''
+    if not marker == '':
+        t = marker + '_'
+    t = t + time.strftime('(%b_%d_%H_%M_%S)') + '_opt_'
     opt['filename'] = t + json.dumps(o, sort_keys=True,
                 separators=(',', ':'))
 
