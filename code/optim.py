@@ -509,7 +509,6 @@ class SGDFB(Optimizer):
 
         g = g0*(1+g1)**state['t']
         dt = g
-        llr = 0.1
 
         state['p'].normal_().mul_(1/np.sqrt(N))*dwcn
         cf = 0
@@ -521,7 +520,7 @@ class SGDFB(Optimizer):
             unflatten_params(model, fw)
             cf, cerr = closure()
             _, cdw = flatten_params(model)
-            p.add_(llr, cdw)
+            p.copy_(cdw)
 
         for i in xrange(int(L/2)): 
             fw.copy_(state['wc'])
@@ -529,7 +528,7 @@ class SGDFB(Optimizer):
             unflatten_params(model, fw)
             cf, cerr = closure()
             _, cdw = flatten_params(model)
-            p.add_(llr, cdw)
+            p.copy_(cdw)
 
         dw.zero_().add_(p)
 
