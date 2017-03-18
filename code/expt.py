@@ -7,11 +7,16 @@ import numpy as np
 import collections
 import pdb
 
-m = lenet({})
-#m = nn.Sequential(nn.Linear(5,3,2))
+#m = lenet({})
+m = nn.Sequential(nn.Linear(5,3,2))
 
-def flatten_params(model):
-    return th.cat([param.data.view(-1) for param in model.parameters()], 0)
+def flatten_params(model, flattened):
+    flattened.zero_()
+    idx = 0
+    for w in model.parameters():
+        n = w.numel()
+        flattened[idx:idx+n].copy_(w.data.view(-1))
+        idx += n
 
 def unflatten_params(model, flattened):
     offset = 0
@@ -24,3 +29,7 @@ def check_flatten():
         x = flatten_params(m)
         unflatten_params(m, x)
     return x
+
+N = num_parameters(m)
+x = th.FloatTensor(N).zero_()
+flatten_params(m, x)

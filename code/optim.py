@@ -2,6 +2,7 @@ from torch.optim import Optimizer
 from copy import deepcopy
 import numpy as np
 import torch as th
+import models
 
 class SGD(Optimizer):
     def __init__(self, params, config = {}):
@@ -245,6 +246,9 @@ class EntropySGDControl(Optimizer):
                 'attach closure for EntropySGDControl, model and criterion'
         mf,merr = closure()
 
+        if not 'N' in state:
+            state['N'] = models.num_parameters(model)
+
         c = self.config
         lr = c['lr']
         mom = c['momentum']
@@ -343,15 +347,21 @@ class EntropySGDControl(Optimizer):
 
         return mf,merr
 
-def flatten_params(model):
-    return th.cat([param.data.view(-1) for param in model.parameters()], 0), \
-        th.cat([param.grad.data.view(-1) for param in model.parameters()], 0)
+def flatten_params(model, fw, dfw):
+    fw.zero_()
+    dfw.zero_()
+    idx = 0
+    for w in model.parameters():
+        n = w.numel()
+        fw[idx:idx+n].copy_(w.data.view(-1))
+        dfw[idx:idx+n].copy_(w.grad.data.view(-1))
+        idx += n
 
-def unflatten_params(model, flattened):
-    offset = 0
-    for param in model.parameters():
-        param.data.copy_(flattened[offset:offset + param.nelement()]).view(param.size())
-        offset += param.nelement()
+def unflatten_params(model, fw):
+    idx = 0
+    for w in model.parameters():
+        w.data.copy_(fw[idx:idx + w.nelement()]).view(w.size())
+        idx += w.nelement()
 
 class SGDPME(Optimizer):
     def __init__(self, params, config = {}):
@@ -372,7 +382,12 @@ class SGDPME(Optimizer):
                 'attach closure for SGDPME, model and criterion'
         mf,merr = closure()
 
+        state = self.state
         c = self.config
+
+        if not 'N' in state:
+            state['N'] = models.num_parameters(model)
+
         lr = c['lr']
         mom = c['momentum']
         wd = c['weight_decay']
@@ -382,29 +397,28 @@ class SGDPME(Optimizer):
         eps = c['eps']
         g0 = c['g0']
         g1 = c['g1']
+        N = state['N']
         verbose = c['verbose']
 
         m = 2
         maxf = 3
 
-        # only deal with the basic group?
-        params = self.param_groups[0]['params']
-        fw, fdw = flatten_params(model)
-        N = fw.numel()
-
-        state = self.state
         # initialize
         if not 't' in state:
             state['t'] = 0
-            state['wc'] = deepcopy(fw)
-            state['dwc'] = deepcopy(fdw)
-            state['mdw'] = deepcopy(fdw)*0
-            state['eta'] = deepcopy(fdw)
-            state['dw'] = deepcopy(fdw)*0
+            state['wc'] = th.FloatTensor(N).cuda()
+            state['dwc'] = th.FloatTensor(N).cuda()
+            state['dw'] = th.FloatTensor(N).cuda()
+
+            state['cache'] = {}
+            state['cache']['w'] = th.FloatTensor(N).cuda().zero_()
+            state['cache']['dw'] = th.FloatTensor(N).cuda().zero_()
+            state['cache']['eta'] = th.FloatTensor(N).cuda()
+
+            state['mdw'] = th.FloatTensor(N).cuda().zero_()
 
         state['t'] += 1
-        state['wc'].copy_(fw)
-        state['dwc'].copy_(fdw)
+        flatten_params(model, state['wc'], state['dwc'])
         wcn, dwcn = state['wc'].norm(), state['dwc'].norm()
 
         g = g0*(1+g1)**state['t']
@@ -413,18 +427,20 @@ class SGDPME(Optimizer):
         #beta = L*dt/h**2      # this is the discretization
         beta = 0.5
 
+        w = state['cache']['w']
         dw = state['dw'].mul_(0)
+        cache_dw = state['cache']['dw'].mul_(0)
         cf = 0
         for i in xrange(L):
-            fw.copy_(state['wc'])
+            w.copy_(state['wc'])
 
-            r = state['eta'].normal_().mul_(1/np.sqrt(N))
-            fw.add_(h, r)
-            unflatten_params(model, fw)
+            r = state['cache']['eta'].normal_().mul_(1/np.sqrt(N))
+            w.add_(h, r)
+            unflatten_params(model, w)
             cf, cerr = closure()
-            _, cdw = flatten_params(model)
+            flatten_params(model, w, cache_dw)
 
-            dw.add_(beta/float(L)*(maxf-cf)**(m-1), cdw)
+            dw.add_(beta/float(L)*(maxf-cf)**(m-1), cache_dw)
 
         dw.add_(1 - beta*(maxf-mf)**(m-1), state['dwc'])
 
@@ -446,11 +462,9 @@ class SGDPME(Optimizer):
             else:
                 dw = state['mdw']
 
-        # update weights
-        fw = state['wc']
-
-        fw.add_(-lr, dw)
-        unflatten_params(model, fw)
+        w = state['wc']
+        w.add_(-lr, dw)
+        unflatten_params(model, w)
         mf,merr = closure()
 
         return mf,merr
@@ -474,7 +488,12 @@ class SGDFB(Optimizer):
                 'attach closure for SGDPME, model and criterion'
         mf,merr = closure()
 
+        state = self.state
         c = self.config
+
+        if not 'N' in state:
+            state['N'] = models.num_parameters(model)
+
         lr = c['lr']
         mom = c['momentum']
         wd = c['weight_decay']
@@ -483,54 +502,59 @@ class SGDFB(Optimizer):
         L = c['L']
         g0 = c['g0']
         g1 = c['g1']
+        N = state['N']
         verbose = c['verbose']
 
         m = 2
         maxf = 3
 
-        # only deal with the basic group?
-        params = self.param_groups[0]['params']
-        fw, fdw = flatten_params(model)
-        N = fw.numel()
-
-        state = self.state
-        # initialize
         if not 't' in state:
             state['t'] = 0
-            state['wc'] = deepcopy(fw)
-            state['dwc'] = deepcopy(fdw)
-            state['mdw'] = deepcopy(fdw)*0
-            state['p'] = deepcopy(fdw)*0
+            state['wc'] = th.FloatTensor(N).cuda()
+            state['dwc'] = th.FloatTensor(N).cuda()
+            state['p'] = th.FloatTensor(N).cuda()
+
+            state['cache'] = {}
+            state['cache']['w'] = th.FloatTensor(N).cuda().zero_()
+            state['cache']['dw'] = th.FloatTensor(N).cuda().zero_()
+
+            state['mdw'] = th.FloatTensor(N).cuda().zero_()
+
 
         state['t'] += 1
-        state['wc'].copy_(fw)
-        state['dwc'].copy_(fdw)
+        flatten_params(model, state['wc'], state['dwc'])
         wcn, dwcn = state['wc'].norm(), state['dwc'].norm()
 
         g = g0*(1+g1)**state['t']
         dt = g
 
+        w = state['cache']['w']
+        p = state['p']
+        cache_w = state['cache']['w'].mul_(0)
+        cache_dw = state['cache']['dw'].mul_(0)
+
+        # initialize
         state['p'].normal_().mul_(1/np.sqrt(N))*dwcn
         cf = 0
-        p = state['p']
-        dw = fdw.zero_()
+
         for i in xrange(int(L/2)):
-            fw.copy_(state['wc'])
-            fw.add_(dt, p)
-            unflatten_params(model, fw)
+            w.copy_(state['wc'])
+            w.add_(dt, p)
+            unflatten_params(model, w)
             cf, cerr = closure()
-            _, cdw = flatten_params(model)
-            p.copy_(cdw)
+            flatten_params(model, cache_w, cache_dw)
+            p.copy_(cache_dw)
 
         for i in xrange(int(L/2)): 
-            fw.copy_(state['wc'])
-            fw.add_(-dt/2., p)
-            unflatten_params(model, fw)
+            w.copy_(state['wc'])
+            w.add_(-dt/2., p)
+            unflatten_params(model, w)
             cf, cerr = closure()
-            _, cdw = flatten_params(model)
-            p.copy_(cdw)
+            flatten_params(model, cache_w, cache_dw)
+            p.copy_(cache_dw)
 
-        dw.zero_().add_(p)
+        dw = state['dwc'].zero_()
+        dw.add_(p)
 
         if verbose and state['t'] % 100 == 0:
             debug = dict(dw=dw.norm(), dwc=state['dwc'].norm(),
@@ -550,10 +574,9 @@ class SGDFB(Optimizer):
                 dw = state['mdw']
 
         # update weights
-        fw = state['wc']
-
-        fw.add_(-lr, dw)
-        unflatten_params(model, fw)
+        w = state['wc']
+        w.add_(-lr, dw)
+        unflatten_params(model, w)
         mf,merr = closure()
 
         return mf,merr
