@@ -156,7 +156,7 @@ class wideresnet(nn.Module):
         nc = [16, 16*widen, 32*widen, 64*widen]
         assert (depth-4)%6 == 0, 'Incorrect depth'
         n = (depth-4)/6
-        opt['d'] = 0.0
+        opt['d'] = 0.3
         if opt['dataset'] == 'cifar10':
             num_classes = 10
         elif opt['dataset'] == 'cifar100':

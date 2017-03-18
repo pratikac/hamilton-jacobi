@@ -35,6 +35,7 @@ if opt['L'] > 0:
     opt['freq'] = 1
 else:
     opt['freq'] = 10
+print(opt)
 
 th.set_num_threads(2)
 th.cuda.set_device(opt['g'])
