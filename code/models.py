@@ -12,10 +12,7 @@ class View(nn.Module):
         return x.view(-1, self.o)
 
 def num_parameters(model):
-    n = 0
-    for w in model.parameters():
-        n += w.numel()
-    return n
+    return sum([w.numel() for w in model.parameters()])
 
 class mnistfc(nn.Module):
     def __init__(self, opt):
@@ -137,6 +134,74 @@ class allcnn(nn.Module):
             convbn(c2,10,1,1),
             nn.AvgPool2d(8),
             View(10))
+
+        s = '[%s] Num parameters: %d'%(self.name, num_parameters(self.m))
+        print(s)
+        logging.info(s)
+
+    def forward(self, x):
+        return self.m(x)
+
+
+class wideresnet(nn.Module):
+    def __init__(self, opt = {'d':0.}, depth=40, num_classes=10, widen=1):
+        super(wideresnet, self).__init__()
+        self.name = 'wideresnet'
+        nc = [16, 16*widen, 32*widen, 64*widen]
+        assert (depth-4)%6 == 0, 'Incorrect depth'
+        n = (depth-4)/6
+
+        class caddtable_t(nn.Module):
+            def __init__(self, ms):
+                super(caddtable_t, self).__init__()
+                self.ms = ms
+
+            def forward(self, x):
+                o = self.ms[0](x)
+                for i in xrange(1, len(self.ms)):
+                    o += self.ms[i](x)
+                return o
+
+        def block(ci, co, s, p=0.):
+            h = nn.Sequential(
+                    nn.BatchNorm2d(ci),
+                    nn.ReLU(inplace=True),
+                    nn.Conv2d(ci, co, kernel_size=3, stride=s, padding=1, bias=False),
+                    nn.Dropout(p),
+                    nn.BatchNorm2d(co),
+                    nn.ReLU(inplace=True),
+                    nn.Conv2d(co, co, kernel_size=3, stride=1, padding=1, bias=False))
+            if ci == co:
+                return caddtable_t([h, nn.Sequential()])
+            else:
+                return caddtable_t([h,
+                    nn.Conv2d(ci, co, kernel_size=1, stride=s, padding=0, bias=False)])
+
+        def netblock(nl, ci, co, blk, s, p=0.):
+            ls = [block(i==0 and ci or co, co, i==0 and s or 1, p) for i in xrange(nl)]
+            return nn.Sequential(*ls)
+
+        self.m = nn.Sequential(
+                nn.Conv2d(3, nc[0], kernel_size=3, stride=1, padding=1, bias=False),
+                netblock(n, nc[0], nc[1], block, 1, opt['d']),
+                netblock(n, nc[1], nc[2], block, 2, opt['d']),
+                netblock(n, nc[2], nc[3], block, 2, opt['d']),
+                nn.BatchNorm2d(nc[3]),
+                nn.ReLU(inplace=True),
+                nn.AvgPool2d(8),
+                View(nc[3]),
+                nn.Linear(nc[3], num_classes))
+
+        # initialize weights
+        for m in self.m.modules():
+            if isinstance(m, nn.Conv2d):
+                n = m.kernel_size[0]*m.kernel_size[1]*m.out_channels
+                m.weight.data.normal_(0, math.sqrt(2./n))
+            elif isinstance(m, nn.BatchNorm2d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
+            elif isinstance(m, nn.Linear):
+                m.bias.data.zero_()
 
         s = '[%s] Num parameters: %d'%(self.name, num_parameters(self.m))
         print(s)

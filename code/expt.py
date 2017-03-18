@@ -33,3 +33,13 @@ def check_flatten():
 N = num_parameters(m)
 x = th.FloatTensor(N).zero_()
 flatten_params(m, x)
+
+class caddtable_t(nn.Module):
+    def __init__(self, ms):
+        super(caddtable_t, self).__init__()
+        self.ms = ms
+    def forward(self, x):
+        o = self.ms[0](x)
+        for i in xrange(1, len(self.ms)):
+            o += self.ms[i](x)
+        return o

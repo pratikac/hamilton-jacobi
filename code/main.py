@@ -82,7 +82,7 @@ def train(e):
     ts = timer()
 
     bsz = opt['b']
-    maxb = int(math.ceil(train_loader.n/bsz))
+    maxb = len(train_loader)
 
     for bi in xrange(maxb):
         def helper():
@@ -136,7 +136,7 @@ def set_dropout(cache = None, p=0):
 
 def dry_feed():
     cache = set_dropout()
-    maxb = int(math.ceil(train_loader.n/opt['b']))
+    maxb = len(train_loader)
     for bi in xrange(maxb):
         x,y = next(train_loader)
         x,y =   Variable(x.cuda(), volatile=True), \
@@ -148,8 +148,7 @@ def val(e, data_loader):
     dry_feed()
     model.eval()
 
-    maxb = int(math.ceil(data_loader.n/opt['b']))
-    
+    maxb = len(data_loader)
     fs, top1 = AverageMeter(), AverageMeter()
     for bi in xrange(maxb):
         x,y = next(data_loader)

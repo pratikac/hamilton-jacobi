@@ -228,7 +228,7 @@ class SGLD(Optimizer):
         return f,err
 
 
-class EntropySGDControl(Optimizer):
+class HJB(Optimizer):
     def __init__(self, params, config = {}):
 
         defaults = dict(lr=0.01, momentum=0, damp=0,
@@ -238,7 +238,7 @@ class EntropySGDControl(Optimizer):
             if config.get(k, None) is None:
                 config[k] = defaults[k]
 
-        super(EntropySGDControl, self).__init__(params, config)
+        super(HJB, self).__init__(params, config)
         self.config = config
 
     def step(self, closure=None, model=None, criterion=None):
@@ -363,7 +363,7 @@ def unflatten_params(model, fw):
         w.data.copy_(fw[idx:idx + w.nelement()]).view(w.size())
         idx += w.nelement()
 
-class SGDPME(Optimizer):
+class PME(Optimizer):
     def __init__(self, params, config = {}):
 
         defaults = dict(lr=0.01, momentum=0, damp=0,
@@ -374,7 +374,7 @@ class SGDPME(Optimizer):
             if config.get(k, None) is None:
                 config[k] = defaults[k]
 
-        super(SGDPME, self).__init__(params, config)
+        super(PME, self).__init__(params, config)
         self.config = config
 
     def step(self, closure=None, model=None, criterion=None):
@@ -469,7 +469,7 @@ class SGDPME(Optimizer):
 
         return mf,merr
 
-class SGDFB(Optimizer):
+class FB(Optimizer):
     def __init__(self, params, config = {}):
 
         defaults = dict(lr=0.01, momentum=0, damp=0,
@@ -480,7 +480,120 @@ class SGDFB(Optimizer):
             if config.get(k, None) is None:
                 config[k] = defaults[k]
 
-        super(SGDFB, self).__init__(params, config)
+        super(FB, self).__init__(params, config)
+        self.config = config
+
+    def step(self, closure=None, model=None, criterion=None):
+        assert (closure is not None) and (model is not None) and (criterion is not None), \
+                'attach closure for SGDPME, model and criterion'
+        mf,merr = closure()
+
+        state = self.state
+        c = self.config
+
+        if not 'N' in state:
+            state['N'] = models.num_parameters(model)
+
+        lr = c['lr']
+        mom = c['momentum']
+        wd = c['weight_decay']
+        damp = c['damp']
+        nesterov = c['nesterov']
+        L = c['L']
+        g0 = c['g0']
+        g1 = c['g1']
+        N = state['N']
+        verbose = c['verbose']
+
+        m = 2
+        maxf = 3
+
+        if not 't' in state:
+            state['t'] = 0
+            state['wc'] = th.FloatTensor(N).cuda()
+            state['dwc'] = th.FloatTensor(N).cuda()
+            state['p'] = th.FloatTensor(N).cuda()
+
+            state['cache'] = {}
+            state['cache']['w'] = th.FloatTensor(N).cuda().zero_()
+            state['cache']['dw'] = th.FloatTensor(N).cuda().zero_()
+
+            state['mdw'] = th.FloatTensor(N).cuda().zero_()
+
+
+        state['t'] += 1
+        flatten_params(model, state['wc'], state['dwc'])
+        wcn, dwcn = state['wc'].norm(), state['dwc'].norm()
+
+        g = g0*(1+g1)**state['t']
+        dt = g
+
+        w = state['cache']['w']
+        p = state['p']
+        cache_w = state['cache']['w'].mul_(0)
+        cache_dw = state['cache']['dw'].mul_(0)
+
+        # initialize
+        state['p'].normal_().mul_(1/np.sqrt(N))*dwcn
+        cf = 0
+
+        for i in xrange(int(L/2)):
+            w.copy_(state['wc'])
+            w.add_(dt, p)
+            unflatten_params(model, w)
+            cf, cerr = closure()
+            flatten_params(model, cache_w, cache_dw)
+            p.copy_(cache_dw)
+
+        for i in xrange(int(L/2)):
+            w.copy_(state['wc'])
+            w.add_(-dt/2., p)
+            unflatten_params(model, w)
+            cf, cerr = closure()
+            flatten_params(model, cache_w, cache_dw)
+            p.copy_(cache_dw)
+
+        dw = state['dwc'].zero_()
+        dw.add_(p)
+
+        if verbose and state['t'] % 100 == 0:
+            debug = dict(dw=dw.norm(), dwc=state['dwc'].norm(),
+                dwdwc=th.dot(dw, state['dwc'])/dw.norm()/state['dwc'].norm(),
+                f=cf, wc=wcn,
+                g=g,
+                dt=dt)
+            print debug
+
+        if wd > 0:
+            dw.add_(wd, state['wc'])
+        if mom > 0:
+            state['mdw'].mul_(mom).add_(1-damp, dw)
+            if nesterov:
+                dw.add_(mom, state['mdw'])
+            else:
+                dw = state['mdw']
+
+        # update weights
+        w = state['wc']
+        w.add_(-lr, dw)
+        unflatten_params(model, w)
+        mf,merr = closure()
+
+        return mf,merr
+
+'''
+class HJBFB(Optimizer):
+    def __init__(self, params, config = {}):
+
+        defaults = dict(lr=0.01, momentum=0, damp=0,
+                 weight_decay=0, nesterov=True,
+                 L=100, g0=1e-2, g1=0,
+                 verbose=False)
+        for k in defaults:
+            if config.get(k, None) is None:
+                config[k] = defaults[k]
+
+        super(HJBFB, self).__init__(params, config)
         self.config = config
 
     def step(self, closure=None, model=None, criterion=None):
@@ -580,3 +693,4 @@ class SGDFB(Optimizer):
         mf,merr = closure()
 
         return mf,merr
+'''

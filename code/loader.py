@@ -1,8 +1,9 @@
 import torch as th
 from torchvision import datasets, transforms
 import torch.utils.data
+
 import numpy as np
-import os, sys, pdb
+import os, sys, pdb, math
 
 class sampler_t:
     def __init__(self, batch_size, x,y, train=True, augment=False):
@@ -50,6 +51,9 @@ class sampler_t:
     def __iter__(self):
         return self
 
+    def __len__(self):
+        return int(math.ceil(self.n / float(self.b)))
+
 def mnist(opt):
     d1, d2 = datasets.MNIST('/local2/pratikac/mnist', train=True), \
             datasets.MNIST('/local2/pratikac/mnist', train=False)
@@ -72,7 +76,49 @@ def rotmnist(opt):
 
     return train, val, val
 
+def _transform_loader(opt):
+    # only for cifar-10 / cifar-100
+    normalize = transforms.Normalize(mean=[x/255.0 for x in [125.3, 123.0, 113.9]],
+                                     std=[x/255.0 for x in [63.0, 62.1, 66.7]])
+
+    if opt['augment']:
+        transform_train = transforms.Compose([
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize,
+            ])
+    else:
+        transform_train = transforms.Compose([
+            transforms.ToTensor(),
+            normalize,
+            ])
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+        normalize
+        ])
+
+    kwargs = {'num_workers': 1, 'pin_memory': True}
+    assert opt['dataset'] == 'cifar10' or opt['dataset'] == 'cifar100'
+
+    train = th.utils.data.DataLoader(
+        datasets.__dict__[opt['dataset'].upper()]('/local2/pratikac/cifar',
+                train=True,
+                download=True,
+                transform=transform_train),
+                batch_size=opt['b'], shuffle=True, **kwargs)
+    val = th.utils.data.DataLoader(
+        datasets.__dict__[opt['dataset'].upper()]('/local2/pratikac/cifar',
+                train=False,
+                transform=transform_test),
+                batch_size=opt['b'], shuffle=False, **kwargs)
+
+    return train, val, val
+
 def cifar10(opt):
+    if 'resnet' in opt['m']:
+        return _transform_loader(opt)
+
     loc = '/local2/pratikac/cifar/preprocessed/'
     d1 = np.load(loc+'train_all.npz')
     d2 = np.load(loc+'test.npz')
@@ -83,7 +129,10 @@ def cifar10(opt):
                      th.from_numpy(d2['labels']), train=False)
     return train, val, val
 
-def cifar100(opt):
+def _cifar100(opt):
+    if 'resnet' in opt['m']:
+        return _transform_loader(opt)
+
     loc = '/local2/pratikac/cifar/preprocessed/'
     d1 = np.load(loc+'cifar-100-train_all.npz')
     d2 = np.load(loc+'cifar-100-test.npz')
@@ -93,6 +142,7 @@ def cifar100(opt):
     val = sampler_t(opt['b'], th.from_numpy(d2['data']),
                      th.from_numpy(d2['labels']), train=False)
     return train, val, val
+
 
 def imagenet(opt, only_train=False):
     loc = '/local2/pratikac/imagenet'
