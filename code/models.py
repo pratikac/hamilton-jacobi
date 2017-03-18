@@ -1,8 +1,7 @@
 import torch as th
 import torch.nn as nn
-from torch.autograd import Variable
-import math
-import logging
+import math, logging, pdb
+
 
 class View(nn.Module):
     def __init__(self,o):
@@ -142,43 +141,45 @@ class allcnn(nn.Module):
     def forward(self, x):
         return self.m(x)
 
+class caddtable_t(nn.Module):
+    def __init__(self, m1, m2):
+        super(caddtable_t, self).__init__()
+        self.m1, self.m2 = m1, m2
+
+    def forward(self, x):
+        return self.m1(x) + self.m2(x)
 
 class wideresnet(nn.Module):
-    def __init__(self, opt = {'d':0.}, depth=40, num_classes=10, widen=1):
+    def __init__(self, opt = {'d':0.}, depth=40, widen=1):
         super(wideresnet, self).__init__()
         self.name = 'wideresnet'
         nc = [16, 16*widen, 32*widen, 64*widen]
         assert (depth-4)%6 == 0, 'Incorrect depth'
         n = (depth-4)/6
-
-        class caddtable_t(nn.Module):
-            def __init__(self, ms):
-                super(caddtable_t, self).__init__()
-                self.ms = ms
-
-            def forward(self, x):
-                o = self.ms[0](x)
-                for i in xrange(1, len(self.ms)):
-                    o += self.ms[i](x)
-                return o
+        opt['d'] = 0.0
+        if opt['dataset'] == 'cifar10':
+            num_classes = 10
+        elif opt['dataset'] == 'cifar100':
+            num_classes = 100
 
         def block(ci, co, s, p=0.):
             h = nn.Sequential(
-                    nn.BatchNorm2d(ci),
+                    #nn.BatchNorm2d(ci),
                     nn.ReLU(inplace=True),
                     nn.Conv2d(ci, co, kernel_size=3, stride=s, padding=1, bias=False),
                     nn.Dropout(p),
-                    nn.BatchNorm2d(co),
+                    #nn.BatchNorm2d(co),
                     nn.ReLU(inplace=True),
                     nn.Conv2d(co, co, kernel_size=3, stride=1, padding=1, bias=False))
             if ci == co:
-                return caddtable_t([h, nn.Sequential()])
+                return caddtable_t(h, nn.Sequential())
             else:
-                return caddtable_t([h,
-                    nn.Conv2d(ci, co, kernel_size=1, stride=s, padding=0, bias=False)])
+                return caddtable_t(h,
+                    nn.Conv2d(ci, co, kernel_size=1, stride=s, padding=0, bias=False))
+            #return nn.Conv2d(ci, co, kernel_size=1, stride=s, padding=0, bias=False)
 
         def netblock(nl, ci, co, blk, s, p=0.):
-            ls = [block(i==0 and ci or co, co, i==0 and s or 1, p) for i in xrange(nl)]
+            ls = [blk(i==0 and ci or co, co, i==0 and s or 1, p) for i in xrange(nl)]
             return nn.Sequential(*ls)
 
         self.m = nn.Sequential(
