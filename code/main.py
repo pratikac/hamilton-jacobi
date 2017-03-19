@@ -12,8 +12,8 @@ import numpy as np
 
 opt = add_args([
 ['-o', '/local2/pratikac/results', 'output'],
-['-m', 'lenet', 'lenet | mnistfc | allcnn'],
-['--optim', 'EntropySGD', 'EntropySGD | EntropySGDControl | SGDPME'],
+['-m', 'lenet', 'lenet | mnistfc | allcnn | wideresnet'],
+['--optim', 'EntropySGD', 'EntropySGD | HJB | PME | FB | LL'],
 ['--dataset', 'mnist', 'mnist | rotmnist | cifar10 | cifar100'],
 ['--retrain', '', 'checkpoint'],
 ['-b', 128, 'batch_size'],
@@ -22,6 +22,7 @@ opt = add_args([
 ['--lr', 0.1, 'learning rate'],
 ['--lr_schedule', '', 'learning rate schedule'],
 ['--l2', 0.0, 'ell-2'],
+['-d', 0.0, 'Dropout'],
 ['-L', 0, 'sgld iterations'],
 ['--eps', 1e-4, 'sgld noise'],
 ['--g0', 0.03, 'gamma'],

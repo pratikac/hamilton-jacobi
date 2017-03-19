@@ -150,13 +150,13 @@ class caddtable_t(nn.Module):
         return self.m1(x) + self.m2(x)
 
 class wideresnet(nn.Module):
-    def __init__(self, opt = {'d':0.}, depth=40, widen=1):
+    def __init__(self, opt = {'d':0.}, depth=40, widen=4):
         super(wideresnet, self).__init__()
         self.name = 'wideresnet'
         nc = [16, 16*widen, 32*widen, 64*widen]
         assert (depth-4)%6 == 0, 'Incorrect depth'
         n = (depth-4)/6
-        opt['d'] = 0.3
+
         if opt['dataset'] == 'cifar10':
             num_classes = 10
         elif opt['dataset'] == 'cifar100':
@@ -164,19 +164,18 @@ class wideresnet(nn.Module):
 
         def block(ci, co, s, p=0.):
             h = nn.Sequential(
-                    #nn.BatchNorm2d(ci),
+                    nn.BatchNorm2d(ci),
                     nn.ReLU(inplace=True),
                     nn.Conv2d(ci, co, kernel_size=3, stride=s, padding=1, bias=False),
-                    nn.Dropout(p),
-                    #nn.BatchNorm2d(co),
+                    nn.BatchNorm2d(co),
                     nn.ReLU(inplace=True),
+                    nn.Dropout(p),
                     nn.Conv2d(co, co, kernel_size=3, stride=1, padding=1, bias=False))
             if ci == co:
                 return caddtable_t(h, nn.Sequential())
             else:
                 return caddtable_t(h,
                     nn.Conv2d(ci, co, kernel_size=1, stride=s, padding=0, bias=False))
-            #return nn.Conv2d(ci, co, kernel_size=1, stride=s, padding=0, bias=False)
 
         def netblock(nl, ci, co, blk, s, p=0.):
             ls = [blk(i==0 and ci or co, co, i==0 and s or 1, p) for i in xrange(nl)]

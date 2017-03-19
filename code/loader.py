@@ -76,7 +76,7 @@ def rotmnist(opt):
 
 def cifar10(opt):
     loc = '/local2/pratikac/cifar/'
-    if 'resnet' in opt['dataset']:
+    if 'resnet' in opt['m']:
         d1 = np.load(loc+'cifar10-train.npz')
         d2 = np.load(loc+'cifar10-test.npz')
     else:
@@ -91,7 +91,7 @@ def cifar10(opt):
 
 def cifar100(opt):
     loc = '/local2/pratikac/cifar/'
-    if 'resnet' in opt['dataset']:
+    if 'resnet' in opt['m']:
         d1 = np.load(loc+'cifar100-train.npz')
         d2 = np.load(loc+'cifar100-test.npz')
     else:
@@ -99,7 +99,7 @@ def cifar100(opt):
         d2 = np.load(loc+'cifar100-test-proc.npz')
 
     train = sampler_t(opt['b'], th.from_numpy(d1['data']),
-                     th.from_numpy(d1['labels']))
+                     th.from_numpy(d1['labels']), augment=opt['augment'])
     val = sampler_t(opt['b'], th.from_numpy(d2['data']),
                      th.from_numpy(d2['labels']), train=False)
     return train, val, val
