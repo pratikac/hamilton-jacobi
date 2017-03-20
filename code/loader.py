@@ -57,7 +57,7 @@ def mnist(opt):
             datasets.MNIST('/local2/pratikac/mnist', train=False)
 
     train = sampler_t(opt['b'], d1.train_data.view(-1,1,28,28).float(),
-        d1.train_labels)
+        d1.train_labels, augment=opt['augment'])
     val = sampler_t(opt['b'], d2.test_data.view(-1,1,28,28).float(),
         d2.test_labels, train=False)
     return train, val, val
@@ -68,7 +68,7 @@ def rotmnist(opt):
     d2 = np.load(loc+'mnist_all_rotation_normalized_float_test.npy')
 
     train = sampler_t(opt['b'], th.from_numpy(d1[:,:-1]).float().view(-1,1,28,28)/255.,
-            th.from_numpy(d1[:,-1]).long())
+            th.from_numpy(d1[:,-1]).long(), augment=opt['augment'])
     val = sampler_t(opt['b'], th.from_numpy(d2[:,:-1]).float().view(-1,1,28,28)/255.,
             th.from_numpy(d2[:,-1]).long(), train=False)
 

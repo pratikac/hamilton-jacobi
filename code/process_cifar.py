@@ -105,9 +105,9 @@ def proc():
 
     wtx = (otx - cifar_mean)/cifar_std
     wvx = (ovx - cifar_mean)/cifar_std
-    print '[Saving baisc mean-std]'
-    np.savez(os.path.join(opt.output, opt.name+'-train.npz'), data=wtx, labels=ty)
-    np.savez(os.path.join(opt.output, opt.name+'-test.npz'), data=wvx, labels=vy)
+    print '[Saving basic mean-std]'
+    np.savez(os.path.join(opt.output, opt.name+'-train.npz'), data=wtx.astype('float32'), labels=ty)
+    np.savez(os.path.join(opt.output, opt.name+'-test.npz'), data=wvx.astype('float32'), labels=vy)
 
     tx, vx = normalize(otx), normalize(ovx)
     txf, vxf = tx.reshape(tx.shape[0], -1).T, vx.reshape(vx.shape[0], -1).T
@@ -118,8 +118,8 @@ def proc():
     vx = pca.transform(D=vxf, whiten=True, ZCA=True).T.reshape(vx.shape)
 
     print '[Saving processed]'
-    np.savez(os.path.join(opt.output, opt.name+'-train-proc.npz'), data=tx, labels=ty)
-    np.savez(os.path.join(opt.output, opt.name+'-test-proc.npz'), data=vx, labels=vy)
+    np.savez(os.path.join(opt.output, opt.name+'-train-proc.npz'), data=tx.astype('float32'), labels=ty)
+    np.savez(os.path.join(opt.output, opt.name+'-test-proc.npz'), data=vx.astype('float32'), labels=vy)
 
     print '[Finished]'
 

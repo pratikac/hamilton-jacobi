@@ -245,11 +245,13 @@ class HJB(Optimizer):
         assert (closure is not None) and (model is not None) and (criterion is not None), \
                 'attach closure for EntropySGDControl, model and criterion'
         mf,merr = closure()
+        
+        c = self.config
+        state = self.state
 
         if not 'N' in state:
             state['N'] = models.num_parameters(model)
 
-        c = self.config
         lr = c['lr']
         mom = c['momentum']
         wd = c['weight_decay']
@@ -263,7 +265,6 @@ class HJB(Optimizer):
         # only deal with the basic group?
         params = self.param_groups[0]['params']
 
-        state = self.state
         # initialize
         if not 't' in state:
             state['t'] = 0
@@ -289,17 +290,17 @@ class HJB(Optimizer):
         llr, beta1 = lp['lr'], lp['beta1']
         g = g0*(1+g1)**state['t']
 
-        minf = -1e3
+        Mp = 1e3
         for i in xrange(L):
             f,err = closure()
 
-            alpha = 0
+            alpha2 = 0
             copy_into_mw = False
             for wc, w in zip(state['wc'], params):
-                alpha += th.norm(wc-w.data)
-            fpalpha = f + alpha
-            if minf < fpalpha:
-                minf = fpalpha
+                alpha2 += th.norm(wc-w.data)**2
+            falpha = f + alpha2/2.
+            if falpha <= Mp:
+                Mp = falpha
                 copy_into_mw = True
 
             for wc,w,mw,mdw,eta in zip(state['wc'], params, \
@@ -379,7 +380,7 @@ class PME(Optimizer):
 
     def step(self, closure=None, model=None, criterion=None):
         assert (closure is not None) and (model is not None) and (criterion is not None), \
-                'attach closure for SGDPME, model and criterion'
+                'attach closure for PME, model and criterion'
         mf,merr = closure()
 
         state = self.state
@@ -401,7 +402,7 @@ class PME(Optimizer):
         verbose = c['verbose']
 
         m = 2
-        maxf = 3
+        Mp = 3
 
         # initialize
         if not 't' in state:
@@ -440,9 +441,9 @@ class PME(Optimizer):
             cf, cerr = closure()
             flatten_params(model, w, cache_dw)
 
-            dw.add_(beta/float(L)*(maxf-cf)**(m-1), cache_dw)
+            dw.add_(beta/float(L)*(Mp-cf)**(m-1), cache_dw)
 
-        dw.add_(1 - beta*(maxf-mf)**(m-1), state['dwc'])
+        dw.add_(1 - beta*(Mp-mf)**(m-1), state['dwc'])
 
         if verbose and state['t'] % 100 == 0:
             debug = dict(dw=dw.norm(), dwc=state['dwc'].norm(),
@@ -451,7 +452,7 @@ class PME(Optimizer):
                 beta=beta,
                 g=g,
                 h=h)
-            print debug
+            print {k : round(v, 4) for k,v in debug.items()}
 
         if wd > 0:
             dw.add_(wd, state['wc'])
@@ -485,7 +486,7 @@ class FB(Optimizer):
 
     def step(self, closure=None, model=None, criterion=None):
         assert (closure is not None) and (model is not None) and (criterion is not None), \
-                'attach closure for SGDPME, model and criterion'
+                'attach closure for FB, model and criterion'
         mf,merr = closure()
 
         state = self.state
@@ -506,7 +507,7 @@ class FB(Optimizer):
         verbose = c['verbose']
 
         m = 2
-        maxf = 3
+        Mp = 3
 
         if not 't' in state:
             state['t'] = 0
@@ -562,7 +563,7 @@ class FB(Optimizer):
                 f=cf, wc=wcn,
                 g=g,
                 dt=dt)
-            print debug
+            print {k : round(v, 4) for k,v in debug.items()}
 
         if wd > 0:
             dw.add_(wd, state['wc'])
@@ -581,8 +582,7 @@ class FB(Optimizer):
 
         return mf,merr
 
-'''
-class HJBFB(Optimizer):
+class ESGDAVG(Optimizer):
     def __init__(self, params, config = {}):
 
         defaults = dict(lr=0.01, momentum=0, damp=0,
@@ -593,12 +593,12 @@ class HJBFB(Optimizer):
             if config.get(k, None) is None:
                 config[k] = defaults[k]
 
-        super(HJBFB, self).__init__(params, config)
+        super(ESGDAVG, self).__init__(params, config)
         self.config = config
 
     def step(self, closure=None, model=None, criterion=None):
         assert (closure is not None) and (model is not None) and (criterion is not None), \
-                'attach closure for SGDPME, model and criterion'
+                'attach closure for LL, model and criterion'
         mf,merr = closure()
 
         state = self.state
@@ -619,18 +619,18 @@ class HJBFB(Optimizer):
         verbose = c['verbose']
 
         m = 2
-        maxf = 3
+        Mp = 3
 
         if not 't' in state:
             state['t'] = 0
             state['wc'] = th.FloatTensor(N).cuda()
             state['dwc'] = th.FloatTensor(N).cuda()
-            state['p'] = th.FloatTensor(N).cuda()
 
             state['cache'] = {}
             state['cache']['w'] = th.FloatTensor(N).cuda().zero_()
             state['cache']['dw'] = th.FloatTensor(N).cuda().zero_()
 
+            state['dw'] = th.FloatTensor(N).cuda().zero_()
             state['mdw'] = th.FloatTensor(N).cuda().zero_()
 
 
@@ -639,43 +639,46 @@ class HJBFB(Optimizer):
         wcn, dwcn = state['wc'].norm(), state['dwc'].norm()
 
         g = g0*(1+g1)**state['t']
-        dt = g
 
-        w = state['cache']['w']
-        p = state['p']
-        cache_w = state['cache']['w'].mul_(0)
-        cache_dw = state['cache']['dw'].mul_(0)
+        w = state['cache']['w'].zero_()
+        cache_dw = state['cache']['dw'].zero_()
 
-        # initialize
-        state['p'].normal_().mul_(1/np.sqrt(N))*dwcn
+        w.copy_(state['wc'])
+        dw = state['dw'].zero_()
+
         cf = 0
-
+        # forward = positive gradient
         for i in xrange(int(L/2)):
-            w.copy_(state['wc'])
-            w.add_(dt, p)
+            cache_dw.zero_()
             unflatten_params(model, w)
             cf, cerr = closure()
-            flatten_params(model, cache_w, cache_dw)
-            p.copy_(cache_dw)
+            flatten_params(model, w, cache_dw)
+            cache_dw.add_(g, w-state['wc']).mul_((Mp-cf)**(m-1))
+            w.add_(-lr, cache_dw)
 
-        for i in xrange(int(L/2)): 
-            w.copy_(state['wc'])
-            w.add_(-dt/2., p)
-            unflatten_params(model, w)
-            cf, cerr = closure()
-            flatten_params(model, cache_w, cache_dw)
-            p.copy_(cache_dw)
+            dw.add_(cache_dw)
 
-        dw = state['dwc'].zero_()
-        dw.add_(p)
+        # w.copy_(state['wc'])
+        # for i in xrange(int(L/2)):
+        #     cache_dw.zero_()
+        #     unflatten_params(model, w)
+        #     cf, cerr = closure()
+        #     flatten_params(model, w, cache_dw)
+        #     cache_dw.mul_(-1)
+        #     cache_dw.add_(g, w-state['wc']).mul_((Mp-cf)**(m-1))
+        #     w.add_(-lr, cache_dw)
+
+        #     dw.add_(0.05, cache_dw)
+
+        dw.mul_(1./float(L))
+        #dw.add_(1-beta*(Mp-mf)**(m-1), state['dwc'])
 
         if verbose and state['t'] % 100 == 0:
             debug = dict(dw=dw.norm(), dwc=state['dwc'].norm(),
                 dwdwc=th.dot(dw, state['dwc'])/dw.norm()/state['dwc'].norm(),
-                f=cf, wc=wcn,
-                g=g,
-                dt=dt)
-            print debug
+                f=cf,
+                g=g)
+            print {k : round(v, 4) for k,v in debug.items()}
 
         if wd > 0:
             dw.add_(wd, state['wc'])
@@ -693,4 +696,151 @@ class HJBFB(Optimizer):
         mf,merr = closure()
 
         return mf,merr
-'''
+
+
+class LL(Optimizer):
+    def __init__(self, params, config = {}):
+
+        defaults = dict(lr=0.01, momentum=0, damp=0,
+                 weight_decay=0, nesterov=True,
+                 L=100, eps=1e-4, g0=1e-2, g1=0,
+                 verbose=False)
+        for k in defaults:
+            if config.get(k, None) is None:
+                config[k] = defaults[k]
+
+        super(LL, self).__init__(params, config)
+        self.config = config
+
+    def step(self, closure=None, model=None, criterion=None):
+        assert (closure is not None) and (model is not None) and (criterion is not None), \
+                'attach closure for LL, model and criterion'
+        mf,merr = closure()
+
+        state = self.state
+        c = self.config
+
+        if not 'N' in state:
+            state['N'] = models.num_parameters(model)
+
+        lr = c['lr']
+        mom = c['momentum']
+        wd = c['weight_decay']
+        damp = c['damp']
+        nesterov = c['nesterov']
+        L = c['L']
+        eps = c['eps']
+        g0 = c['g0']
+        g1 = c['g1']
+        N = state['N']
+        verbose = c['verbose']
+
+        if not 't' in state:
+            state['t'] = 0
+            state['wc'] = th.FloatTensor(N).cuda()
+            state['dwc'] = th.FloatTensor(N).cuda()
+
+            state['cache'] = {}
+            state['cache']['w'] = th.FloatTensor(N).cuda().zero_()
+            state['cache']['dw'] = th.FloatTensor(N).cuda().zero_()
+
+            state['cache']['y'] = th.FloatTensor(N).cuda().zero_()
+            state['cache']['z'] = th.FloatTensor(N).cuda().zero_()
+
+            state['dw'] = th.FloatTensor(N).cuda().zero_()
+            state['mdw'] = th.FloatTensor(N).cuda().zero_()
+            state['eta'] = th.FloatTensor(N).cuda()
+
+        state['t'] += 1
+        flatten_params(model, state['wc'], state['dwc'])
+        wcn, dwcn = state['wc'].norm(), state['dwc'].norm()
+
+        g = g0*(1+g1)**state['t']
+
+        dw = state['dw'].zero_()
+        eta = state['eta']
+
+        llr = 0.1
+        cf = 0
+        Mm, Mp = -1e3, 1e3
+
+        w = state['cache']['w'].zero_()
+        cache_dw = state['cache']['dw'].zero_()
+        w.copy_(state['wc'])
+
+        for i in xrange(int(L/2)):
+            cache_dw.zero_()
+            unflatten_params(model, w)
+            cf, cerr = closure()
+
+            copy_in = False
+            falpha = cf + (w-state['wc']).norm()**2*g/2.
+            if falpha <= Mp:
+                Mp = falpha
+                copy_in = True
+
+            flatten_params(model, w, cache_dw)
+            cache_dw.add_(g, w-state['wc'])
+
+            # add noise
+            eta.normal_()
+            cache_dw.add_(eps/np.sqrt(0.5*llr), eta)
+
+            w.add_(-llr, cache_dw)
+
+            if copy_in:
+                state['cache']['y'].copy_(w)
+
+        w = state['cache']['w'].zero_()
+        cache_dw = state['cache']['dw'].zero_()
+        w.copy_(state['wc'])
+
+        for i in xrange(int(L/2)):
+            cache_dw.zero_()
+            unflatten_params(model, w)
+            cf, cerr = closure()
+
+            copy_in = False
+            falpha = cf - (w-state['wc']).norm()**2*g/2.
+            if Mm <= falpha:
+                Mm = falpha
+                copy_in = True
+
+            flatten_params(model, w, cache_dw)
+            cache_dw.add_(2*g, w-state['wc'])
+
+            eta.normal_()
+            cache_dw.add_(eps/np.sqrt(0.5*llr), eta)
+
+            w.add_(-llr, cache_dw)
+
+            if copy_in:
+                state['cache']['z'].copy_(w)
+
+        # copy grad in
+        dw.copy_(state['wc'] - state['cache']['y'])
+        dw.add_(1, state['wc'] - state['cache']['z'])
+
+        if verbose and state['t'] % 10 == 0:
+            debug = dict(dw=dw.norm(), dwc=state['dwc'].norm(),
+                dwdwc=th.dot(dw, state['dwc'])/dw.norm()/state['dwc'].norm(),
+                f=cf,
+                g=g)
+            print {k : round(v, 4) for k,v in debug.items()}
+
+        if wd > 0:
+            dw.add_(wd, state['wc'])
+        if mom > 0:
+            state['mdw'].mul_(mom).add_(1-damp, dw)
+            if nesterov:
+                dw.add_(mom, state['mdw'])
+            else:
+                dw = state['mdw']
+
+        # update weights
+        w = state['wc']
+        w.add_(-lr, dw)
+        unflatten_params(model, w)
+        mf,merr = closure()
+
+        return mf,merr
