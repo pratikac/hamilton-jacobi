@@ -631,7 +631,6 @@ class ESGDAVG(Optimizer):
             state['dw'] = th.FloatTensor(N).cuda().zero_()
             state['mdw'] = th.FloatTensor(N).cuda().zero_()
 
-
         state['t'] += 1
         flatten_params(model, state['wc'], state['dwc'])
         wcn, dwcn = state['wc'].norm(), state['dwc'].norm()
@@ -835,6 +834,131 @@ class LL(Optimizer):
                 dw = state['mdw']
 
         # update weights
+        w = state['wc']
+        w.add_(-lr, dw)
+        unflatten_params(model, w)
+        mf,merr = closure()
+
+        return mf,mer
+
+class PMELAP(Optimizer):
+    def __init__(self, params, config = {}):
+
+        defaults = dict(lr=0.01, momentum=0, damp=0,
+                 weight_decay=0, nesterov=True,
+                 L=100, eps=1e-4, g0=1e-2, g1=0,
+                 verbose=False)
+        for k in defaults:
+            if config.get(k, None) is None:
+                config[k] = defaults[k]
+
+        super(PMELAP, self).__init__(params, config)
+        self.config = config
+
+    def step(self, closure=None, model=None, criterion=None):
+        assert (closure is not None) and (model is not None) and (criterion is not None), \
+                'attach closure for PMELAP, model and criterion'
+        mf,merr = closure()
+
+        state = self.state
+        c = self.config
+
+        if not 'N' in state:
+            state['N'] = models.num_parameters(model)
+
+        lr = c['lr']
+        mom = c['momentum']
+        wd = c['weight_decay']
+        damp = c['damp']
+        nesterov = c['nesterov']
+        L = c['L']
+        g0 = c['g0']
+        g1 = c['g1']
+        eps = c['eps']
+        N = state['N']
+        verbose = c['verbose']
+
+        m = 2
+        Mp = 3
+
+        if not 't' in state:
+            state['t'] = 0
+            tmp = th.FloatTensor(N).cuda()
+            state['wc'] = tmp.clone()
+            state['dwc'] = tmp.clone()
+
+            state['cache'] = {}
+            cache = state['cache']
+            cache['f'], cache['fm'], cache['fmm'] = 0, 0, 0
+
+            cache['w'] = tmp.clone().zero_()
+            cache['dw'] = tmp.clone().zero_()
+            cache['wm'] = tmp.clone().zero_()
+            cache['dwm'] = tmp.clone().zero_()
+            cache['wmm'] = tmp.clone().zero_()
+            cache['dwmm'] = tmp.clone().zero_()
+
+            state['dw'] = tmp.clone().zero_()
+            state['eta'] = tmp.clone()
+            state['mdw'] = tmp.clone().zero_()
+
+        state['t'] += 1
+        flatten_params(model, state['wc'], state['dwc'])
+
+        g = g0*(1+g1)**state['t']
+
+        cache = state['cache']
+        w = cache['w']
+        dw = cache['dw']
+        eta = state['eta']
+
+        w.copy_(state['wc'])
+        state['dw'].zero_()
+
+        llr = 0.1
+        for i in xrange(L):
+            w, wm, wmm = cache['w'], cache['wm'], cache['wmm']
+            dw, dwm, dwmm = cache['dw'], cache['dwm'], cache['dwmm']
+
+            # update the cache
+            dwmm.copy_(dwm)
+            dwm.copy_(dw)
+            wmm.copy_(wm)
+            wm.copy_(w)
+            cache['fmm'] = cache['fm']
+            cache['fm'] = cache['f']
+
+            dw.zero_()
+            unflatten_params(model, w)
+            cache['f'], cerr = closure()
+            flatten_params(model, w, dw)
+
+            h = (w-wmm).norm()/2.
+            state['dw'].add_(1/h**2, dw-dwm).add_(-1/h**2, dwm-dwmm)
+
+            eta.normal_()
+            dw.add_(-g, w-state['wc']).add_(eps/np.sqrt(0.5*llr), eta)
+            w.add_(-llr, dw)
+
+        dw = state['dw']
+        dw.mul_(1./float(L))
+
+        if verbose and state['t'] % 100 == 0:
+            debug = dict(dw=dw.norm(), dwc=state['dwc'].norm(),
+                dwdwc=th.dot(dw, state['dwc'])/dw.norm()/state['dwc'].norm(),
+                f=cache['f'], fm=cache['fm'], fmm=cache['fmm'],
+                g=g)
+            print {k : round(v, 4) for k,v in debug.items()}
+
+        if wd > 0:
+            dw.add_(wd, state['wc'])
+        if mom > 0:
+            state['mdw'].mul_(mom).add_(1-damp, dw)
+            if nesterov:
+                dw.add_(mom, state['mdw'])
+            else:
+                dw = state['mdw']
+
         w = state['wc']
         w.add_(-lr, dw)
         unflatten_params(model, w)
