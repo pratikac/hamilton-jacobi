@@ -1,7 +1,7 @@
 import os, pdb, sys, json, subprocess
 import numpy as np
-import time
-import logging
+import time, logging, pprint
+
 import torch as th
 import argparse
 
@@ -93,6 +93,10 @@ def create_logger(opt, idx=0):
     l.info('SHA %s'%r[0])
     l.info('STATUS %s'%r[1])
     l.info('DIFF %s'%r[2])
+
+    s = pprint.pformat(opt)
+    l.info(s)
+    l.info('')
 
     return l
 

@@ -10,6 +10,7 @@ from exptutils import *
 import models, loader, optim
 import numpy as np
 import logging
+from pprint import pprint
 
 opt = add_args([
 ['-o', '/local2/pratikac/results', 'output'],
@@ -68,7 +69,7 @@ build_filename(opt, blacklist=['lr_schedule','retrain','step', \
                             'ratio','freq','v','dataset', 'augment', 'd',
                             'depth', 'widen'])
 logger = create_logger(opt)
-print(opt)
+pprint(opt)
 
 def schedule(e):
     if opt['lr_schedule'] == '':
