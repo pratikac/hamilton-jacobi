@@ -19,9 +19,12 @@ opt = add_args([
 ['-b', 128, 'batch_size'],
 ['--augment', False, 'data augmentation'],
 ['-B', 100, 'Max epochs'],
+['--depth', 16, 'ResNet depth'],
+['--widen', 2, 'ResNet widen'],
 ['--lr', 0.1, 'learning rate'],
 ['--lr_schedule', '', 'learning rate schedule'],
 ['--l2', 0.0, 'ell-2'],
+['-d', 0.0, 'Dropout'],
 ['-L', 0, 'sgld iterations'],
 ['--eps', 1e-4, 'sgld noise'],
 ['--g0', 0.03, 'gamma'],
@@ -37,15 +40,19 @@ else:
     opt['freq'] = 10
 
 th.set_num_threads(2)
-th.cuda.set_device(opt['g'])
+if opt['g'] in [0, 1, 2]:
+    th.cuda.set_device(opt['g'])
 random.seed(opt['s'])
 np.random.seed(opt['s'])
 th.manual_seed(opt['s'])
-th.cuda.manual_seed(opt['s'])
+th.cuda.manual_seed_all(opt['s'])
 cudnn.benchmark = True
 
 train_loader, val_loader, test_loader = getattr(loader, opt['dataset'])(opt)
-model = getattr(models, opt['m'])(opt).cuda()
+model = getattr(models, opt['m'])(opt)
+if opt['g'] > 2:
+    model = th.nn.DataParallel(model)
+model = model.cuda()
 criterion = nn.CrossEntropyLoss().cuda()
 optimizer = getattr(optim, opt['optim'])(model.parameters(),
         config = dict(lr=opt['lr'], momentum=0.9, nesterov=True, weight_decay=opt['l2'],
@@ -174,7 +181,8 @@ def val(e, data_loader):
 def main():
     print(opt)
     build_filename(opt, blacklist=['lr_schedule','retrain','step', \
-                                'ratio','freq','v','dataset', 'augment', 'd'])
+                                'ratio','freq','v','dataset', 'augment', 'd',
+                                'depth', 'widen'])
     create_logger(opt)
     for e in xrange(opt['B']):
         train(e)

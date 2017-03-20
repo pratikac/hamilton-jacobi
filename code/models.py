@@ -157,18 +157,19 @@ class wideresnet(nn.Module):
         super(wideresnet, self).__init__()
         self.name = 'wideresnet'
 
+        d = opt.get('d', 0.)
         depth = opt.get('depth', 16)
         widen = opt.get('widen', 2)
         opt['l2'] = 5e-4
-
-        nc = [16, 16*widen, 32*widen, 64*widen]
-        assert (depth-4)%6 == 0, 'Incorrect depth'
-        n = (depth-4)/6
 
         if opt['dataset'] == 'cifar10':
             num_classes = 10
         elif opt['dataset'] == 'cifar100':
             num_classes = 100
+
+        nc = [16, 16*widen, 32*widen, 64*widen]
+        assert (depth-4)%6 == 0, 'Incorrect depth'
+        n = (depth-4)/6
 
         def block(ci, co, s, p=0.):
             h = nn.Sequential(
@@ -190,9 +191,9 @@ class wideresnet(nn.Module):
 
         self.m = nn.Sequential(
                 nn.Conv2d(3, nc[0], kernel_size=3, stride=1, padding=1),
-                netblock(n, nc[0], nc[1], block, 1),
-                netblock(n, nc[1], nc[2], block, 2),
-                netblock(n, nc[2], nc[3], block, 2),
+                netblock(n, nc[0], nc[1], block, 1, d),
+                netblock(n, nc[1], nc[2], block, 2, d),
+                netblock(n, nc[2], nc[3], block, 2, d),
                 nn.BatchNorm2d(nc[3]),
                 nn.ReLU(inplace=True),
                 nn.AvgPool2d(8),
