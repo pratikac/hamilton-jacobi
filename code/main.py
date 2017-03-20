@@ -30,7 +30,7 @@ opt = add_args([
 ['-s', 42, 'seed'],
 ['-g', 0, 'gpu idx'],
 ['-l', False, 'log'],
-['-v', False, 'Verbose']
+['-v', False, 'verbose']
 ])
 if opt['L'] > 0:
     opt['freq'] = 1

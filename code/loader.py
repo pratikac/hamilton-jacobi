@@ -3,7 +3,8 @@ from torchvision import datasets, transforms
 import torch.utils.data
 
 import numpy as np
-import os, sys, pdb, math
+import os, sys, pdb, math, random
+import cv2
 
 class sampler_t:
     def __init__(self, batch_size, x,y, train=True, augment=False):
@@ -23,12 +24,22 @@ class sampler_t:
                     th.index_select(self.y, 0, self.idx)
 
             if self.augment:
+                p = 4
                 r = np.random.randint(0, 1, self.b)
-                x = x.numpy()
+                x = x.numpy().transpose(0,2,3,1)
+                sz = x.shape[1]
                 for i in xrange(self.b):
                     if r[i] == 1:
                         x[i] = np.fliplr(x[i])
 
+                    # pad
+                    res = cv2.copyMakeBorder(x[i], p,p,p,p,
+                            borderType=cv2.BORDER_REFLECT, value=0)
+                    szx, szy,_ = res.shape
+                    sz1, sz2 = random.randint(0, szx-sz), random.randint(0, szy-sz)
+                    x[i] = res[sz2:sz2+sz, sz1:sz1+sz, :]
+
+                x = x.transpose(0,3,1,2)
                 x = th.from_numpy(x)
         else:
             s = self.sidx

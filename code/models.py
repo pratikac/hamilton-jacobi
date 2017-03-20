@@ -150,7 +150,7 @@ class caddtable_t(nn.Module):
         return self.m1(x) + self.m2(x)
 
 class wideresnet(nn.Module):
-    def __init__(self, opt = {'d':0.}, depth=40, widen=4):
+    def __init__(self, opt = {'d':0.}, depth=16, widen=2):
         super(wideresnet, self).__init__()
         self.name = 'wideresnet'
         nc = [16, 16*widen, 32*widen, 64*widen]
@@ -163,27 +163,25 @@ class wideresnet(nn.Module):
             num_classes = 100
 
         def block(ci, co, s, p=0.):
-            b = nn.Sequential(nn.BatchNorm2d(ci),
-                    nn.ReLU(inplace=True))
             h = nn.Sequential(
-                    nn.Conv2d(ci, co, kernel_size=3, stride=s, padding=1, bias=False),
+                    nn.Sequential(nn.BatchNorm2d(ci),
+                    nn.ReLU(inplace=True)),
+                    nn.Conv2d(ci, co, kernel_size=3, stride=s, padding=1),
                     nn.BatchNorm2d(co),
                     nn.ReLU(inplace=True),
-                    nn.Dropout(p),
-                    nn.Conv2d(co, co, kernel_size=3, stride=1, padding=1, bias=False))
+                    nn.Conv2d(co, co, kernel_size=3, stride=1, padding=1))
             if ci == co:
-                t = caddtable_t(h, nn.Sequential())
+                return caddtable_t(h, nn.Sequential())
             else:
-                t = caddtable_t(h,
-                    nn.Conv2d(ci, co, kernel_size=1, stride=s, padding=0, bias=False))
-                return nn.Sequential(b, t)
+                return caddtable_t(h,
+                        nn.Conv2d(ci, co, kernel_size=1, stride=s))
 
         def netblock(nl, ci, co, blk, s, p=0.):
             ls = [blk(i==0 and ci or co, co, i==0 and s or 1, p) for i in xrange(nl)]
             return nn.Sequential(*ls)
 
         self.m = nn.Sequential(
-                nn.Conv2d(3, nc[0], kernel_size=3, stride=1, padding=1, bias=False),
+                nn.Conv2d(3, nc[0], kernel_size=3, stride=1, padding=1),
                 netblock(n, nc[0], nc[1], block, 1, opt['d']),
                 netblock(n, nc[1], nc[2], block, 2, opt['d']),
                 netblock(n, nc[2], nc[3], block, 2, opt['d']),

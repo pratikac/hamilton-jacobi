@@ -4,6 +4,22 @@ import numpy as np
 import torch as th
 import models
 
+def flatten_params(model, fw, dfw):
+    fw.zero_()
+    dfw.zero_()
+    idx = 0
+    for w in model.parameters():
+        n = w.numel()
+        fw[idx:idx+n].copy_(w.data.view(-1))
+        dfw[idx:idx+n].copy_(w.grad.data.view(-1))
+        idx += n
+
+def unflatten_params(model, fw):
+    idx = 0
+    for w in model.parameters():
+        w.data.copy_(fw[idx:idx + w.nelement()]).view(w.size())
+        idx += w.nelement()
+
 class SGD(Optimizer):
     def __init__(self, params, config = {}):
 
@@ -49,7 +65,7 @@ class SGD(Optimizer):
 
         return loss
 
-class EntropySGD(Optimizer):
+class ESGD(Optimizer):
     def __init__(self, params, config = {}):
 
         defaults = dict(lr=0.01, momentum=0, damp=0,
@@ -59,7 +75,7 @@ class EntropySGD(Optimizer):
             if config.get(k, None) is None:
                 config[k] = defaults[k]
 
-        super(EntropySGD, self).__init__(params, config)
+        super(ESGD, self).__init__(params, config)
         self.config = config
 
     def step(self, closure=None, model=None, criterion=None):
@@ -227,7 +243,6 @@ class SGLD(Optimizer):
 
         return f,err
 
-
 class HJB(Optimizer):
     def __init__(self, params, config = {}):
 
@@ -262,7 +277,6 @@ class HJB(Optimizer):
         g0 = c['g0']
         g1 = c['g1']
 
-        # only deal with the basic group?
         params = self.param_groups[0]['params']
 
         # initialize
@@ -347,22 +361,6 @@ class HJB(Optimizer):
             w.data.add_(-lr, dw)
 
         return mf,merr
-
-def flatten_params(model, fw, dfw):
-    fw.zero_()
-    dfw.zero_()
-    idx = 0
-    for w in model.parameters():
-        n = w.numel()
-        fw[idx:idx+n].copy_(w.data.view(-1))
-        dfw[idx:idx+n].copy_(w.grad.data.view(-1))
-        idx += n
-
-def unflatten_params(model, fw):
-    idx = 0
-    for w in model.parameters():
-        w.data.copy_(fw[idx:idx + w.nelement()]).view(w.size())
-        idx += w.nelement()
 
 class PME(Optimizer):
     def __init__(self, params, config = {}):
@@ -696,7 +694,6 @@ class ESGDAVG(Optimizer):
         mf,merr = closure()
 
         return mf,merr
-
 
 class LL(Optimizer):
     def __init__(self, params, config = {}):
