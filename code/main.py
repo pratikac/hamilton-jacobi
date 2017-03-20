@@ -22,7 +22,6 @@ opt = add_args([
 ['--lr', 0.1, 'learning rate'],
 ['--lr_schedule', '', 'learning rate schedule'],
 ['--l2', 0.0, 'ell-2'],
-['-d', 0.0, 'Dropout'],
 ['-L', 0, 'sgld iterations'],
 ['--eps', 1e-4, 'sgld noise'],
 ['--g0', 0.03, 'gamma'],
@@ -36,7 +35,6 @@ if opt['L'] > 0:
     opt['freq'] = 1
 else:
     opt['freq'] = 10
-print(opt)
 
 th.set_num_threads(2)
 th.cuda.set_device(opt['g'])
@@ -172,15 +170,19 @@ def val(e, data_loader):
     print((color('red', '**[%2d] %2.4f %2.4f%%\n'))%(e, fs.avg, top1.avg))
     print('')
 
-build_filename(opt, blacklist=['lr_schedule','retrain','step', \
-                            'ratio','freq','v','dataset', 'augment', 'd'])
-create_logger(opt)
 
-for e in xrange(opt['B']):
-    train(e)
-    if e % opt['freq'] == opt['freq'] -1:
-        val(e, val_loader)
-    #save(model, opt)
+def main():
+    print(opt)
+    build_filename(opt, blacklist=['lr_schedule','retrain','step', \
+                                'ratio','freq','v','dataset', 'augment', 'd'])
+    create_logger(opt)
+    for e in xrange(opt['B']):
+        train(e)
+        if e % opt['freq'] == opt['freq'] -1:
+            val(e, val_loader)
+        #save(model, opt)
 
-# print(color('red', 'Test error: '))
-# val(e, test_loader)
+    # print(color('red', 'Test error: '))
+    # val(e, test_loader)
+
+main()

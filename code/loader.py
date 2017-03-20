@@ -32,7 +32,7 @@ class sampler_t:
                     if r[i] == 1:
                         x[i] = np.fliplr(x[i])
 
-                    # pad
+                    # pad using reflect to preserve color?
                     res = cv2.copyMakeBorder(x[i], p,p,p,p,
                             borderType=cv2.BORDER_REFLECT, value=0)
                     szx, szy,_ = res.shape
@@ -44,7 +44,6 @@ class sampler_t:
         else:
             s = self.sidx
             e = min(s+self.b-1, self.n-1)
-            #print s,e
 
             self.idx = th.range(s, e).long()
             self.sidx += self.b

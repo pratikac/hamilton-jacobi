@@ -20,6 +20,7 @@ class mnistfc(nn.Module):
 
         c = 1024
         opt['d'] = 0.5
+        opt['l2'] = 0.
 
         self.m = nn.Sequential(
             View(784),
@@ -44,6 +45,7 @@ class lenet(nn.Module):
         super(lenet, self).__init__()
         self.name = 'lenet'
         opt['d'] = 0.25
+        opt['l2'] = 0.
 
         def convbn(ci,co,ksz,psz,p):
             return nn.Sequential(
@@ -106,12 +108,13 @@ class rotlenet(nn.Module):
     def forward(self, x):
         return self.m(x)
 
-
 class allcnn(nn.Module):
     def __init__(self, opt = {'d':0.5}, c1=96, c2= 192):
         super(allcnn, self).__init__()
         self.name = 'allcnn'
+
         opt['d'] = 0.5
+        opt['l2'] = 1e-3
 
         def convbn(ci,co,ksz,s=1,pz=0):
             return nn.Sequential(
@@ -150,9 +153,14 @@ class caddtable_t(nn.Module):
         return self.m1(x) + self.m2(x)
 
 class wideresnet(nn.Module):
-    def __init__(self, opt = {'d':0.}, depth=16, widen=2):
+    def __init__(self, opt = {'d':0., 'depth':16, 'widen':2}):
         super(wideresnet, self).__init__()
         self.name = 'wideresnet'
+
+        depth = opt.get('depth', 16)
+        widen = opt.get('widen', 2)
+        opt['l2'] = 5e-4
+
         nc = [16, 16*widen, 32*widen, 64*widen]
         assert (depth-4)%6 == 0, 'Incorrect depth'
         n = (depth-4)/6
@@ -182,9 +190,9 @@ class wideresnet(nn.Module):
 
         self.m = nn.Sequential(
                 nn.Conv2d(3, nc[0], kernel_size=3, stride=1, padding=1),
-                netblock(n, nc[0], nc[1], block, 1, opt['d']),
-                netblock(n, nc[1], nc[2], block, 2, opt['d']),
-                netblock(n, nc[2], nc[3], block, 2, opt['d']),
+                netblock(n, nc[0], nc[1], block, 1),
+                netblock(n, nc[1], nc[2], block, 2),
+                netblock(n, nc[2], nc[3], block, 2),
                 nn.BatchNorm2d(nc[3]),
                 nn.ReLU(inplace=True),
                 nn.AvgPool2d(8),
