@@ -70,6 +70,7 @@ def gitrev(opt):
 def create_logger(opt, idx=0):
     if not opt['l']:
         return
+
     if len(opt.get('retrain', '')) > 0:
         print 'Retraining, will stop logging'
         return
@@ -80,20 +81,14 @@ def create_logger(opt, idx=0):
     d = opt.get('o','/local2/pratikac/results')
     fn = os.path.join(d, opt['filename']+'.log')
     l = logging.getLogger('%s'%idx)
-    l.setLevel(logging.DEBUG)
-    fmt = logging.Formatter('%(message)s')
+    l.propagate = False
 
     fh = logging.FileHandler(fn)
-    fh.setLevel(logging.DEBUG)
+    fmt = logging.Formatter('%(message)s')
     fh.setFormatter(fmt)
+    l.setLevel(logging.INFO)
     l.addHandler(fh)
 
-    '''
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
-    ch.setFormatter(fmt)
-    l.addHandler(ch)
-    '''
     r = gitrev(opt)
     l.info('SHA %s'%r[0])
     l.info('STATUS %s'%r[1])

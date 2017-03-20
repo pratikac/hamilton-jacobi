@@ -9,11 +9,12 @@ import torch.backends.cudnn as cudnn
 from exptutils import *
 import models, loader, optim
 import numpy as np
+import logging
 
 opt = add_args([
 ['-o', '/local2/pratikac/results', 'output'],
 ['-m', 'lenet', 'lenet | mnistfc | allcnn | wideresnet'],
-['--optim', 'EntropySGD', 'EntropySGD | HJB | PME | FB | LL'],
+['--optim', 'ESGD', 'ESGD | HJB | PME | FB | LL | PMEAVG'],
 ['--dataset', 'mnist', 'mnist | rotmnist | cifar10 | cifar100'],
 ['--retrain', '', 'checkpoint'],
 ['-b', 128, 'batch_size'],
@@ -63,6 +64,12 @@ if not opt['retrain'] == '':
     model.load_state_dict(ckpt['state_dict'])
     print('Retraining model: %s'%ckpt['name'])
 
+build_filename(opt, blacklist=['lr_schedule','retrain','step', \
+                            'ratio','freq','v','dataset', 'augment', 'd',
+                            'depth', 'widen'])
+logger = create_logger(opt)
+print(opt)
+
 def schedule(e):
     if opt['lr_schedule'] == '':
         opt['lr_schedule'] = json.dumps([[opt['B'], opt['lr']]])
@@ -77,7 +84,7 @@ def schedule(e):
     lr = lrs[idx][1]
 
     print('[LR]: ', lr)
-    logging.info('[LR] %.5f'%lr)
+    logger.info('[LR] %.5f'%lr)
     optimizer.config['lr'] = lr
 
 def train(e):
@@ -115,14 +122,14 @@ def train(e):
         top1.update(err, bsz)
 
         s = dict(i=bi + e*maxb, e=e, f=f, top1=err)
-        logging.info(json.dumps(s))
+        logger.info(json.dumps(s))
 
         if bi % 100 == 0 and bi != 0:
             print((color('blue', '[%2d][%4d/%4d] %2.4f %2.2f%%'))%(e,bi,maxb,
                 fs.avg, top1.avg))
 
     s = dict(e=e, i=0, f=fs.avg, top1=top1.avg)
-    logging.info(json.dumps(s))
+    logger.info(json.dumps(s))
 
     print(  (color('blue', '++[%2d] %2.4f %2.2f%% [%.2fs]'))% (e,
             fs.avg, top1.avg, timer()-ts))
@@ -173,24 +180,16 @@ def val(e, data_loader):
         top1.update(err, bsz)
 
     s = dict(e=e, i=0, f=fs.avg, top1=top1.avg)
-    logging.info(json.dumps(s))
+    logger.info(json.dumps(s))
     print((color('red', '**[%2d] %2.4f %2.4f%%\n'))%(e, fs.avg, top1.avg))
     print('')
 
 
-def main():
-    print(opt)
-    build_filename(opt, blacklist=['lr_schedule','retrain','step', \
-                                'ratio','freq','v','dataset', 'augment', 'd',
-                                'depth', 'widen'])
-    create_logger(opt)
-    for e in xrange(opt['B']):
-        train(e)
-        if e % opt['freq'] == opt['freq'] -1:
-            val(e, val_loader)
-        #save(model, opt)
+for e in xrange(opt['B']):
+    train(e)
+    if e % opt['freq'] == opt['freq'] -1:
+        val(e, val_loader)
+    #save(model, opt)
 
-    # print(color('red', 'Test error: '))
-    # val(e, test_loader)
-
-main()
+# print(color('red', 'Test error: '))
+# val(e, test_loader)
