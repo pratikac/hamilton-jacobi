@@ -29,7 +29,7 @@ opt = add_args([
 ['-d', 0.0, 'Dropout'],
 ['-L', 0, 'sgld iterations'],
 ['--eps', 1e-4, 'sgld noise'],
-['--g0', 0.03, 'gamma'],
+['--g0', 1e-4, 'gamma'],
 ['--g1', 0.0, 'scoping'],
 ['-s', 42, 'seed'],
 ['-g', 0, 'gpu idx'],
