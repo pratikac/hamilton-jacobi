@@ -19,22 +19,26 @@ class mnistfc(nn.Module):
         self.name = 'mnsitfc'
 
         c = 1024
-        opt['d'] = 0.5
+        opt['d'] = 0.2
         opt['l2'] = 0.
 
         self.m = nn.Sequential(
             View(784),
+            nn.Dropout(0.2),
             nn.Linear(784,c),
-            nn.ReLU(True),
+            nn.ReLU(inplace=True),
+            nn.BatchNorm1d(c),
             nn.Dropout(opt['d']),
             nn.Linear(c,c),
-            nn.ReLU(True),
+            nn.ReLU(inplace=True),
             nn.Dropout(opt['d']),
+            nn.BatchNorm1d(c),
             nn.Linear(c,10))
 
         s = '[%s] Num parameters: %d'%(self.name, num_parameters(self.m))
         print(s)
         logging.info(s)
+
 
     def forward(self, x):
         return self.m(x)

@@ -33,9 +33,7 @@ class SGD(Optimizer):
         self.config = config
 
     def step(self, closure=None, model=None, criterion=None):
-        loss = None
-        if closure is not None:
-            loss = closure()
+        loss, err = closure()
 
         c = self.config
         wd = c['weight_decay']
@@ -63,7 +61,7 @@ class SGD(Optimizer):
 
             w.data.add_(-lr, dw)
 
-        return loss
+        return loss, err
 
 class SGLD(Optimizer):
     def __init__(self, params, config = {}):

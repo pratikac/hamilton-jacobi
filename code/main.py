@@ -34,12 +34,11 @@ opt = add_args([
 ['-s', 42, 'seed'],
 ['-g', 0, 'gpu idx'],
 ['-l', False, 'log'],
+['-f', 10, 'print freq'],
 ['-v', False, 'verbose']
 ])
 if opt['L'] > 0:
-    opt['freq'] = 1
-else:
-    opt['freq'] = 10
+    opt['f'] = 1
 
 th.set_num_threads(2)
 if opt['g'] in [0, 1, 2]:
@@ -66,7 +65,7 @@ if not opt['retrain'] == '':
     print('Retraining model: %s'%ckpt['name'])
 
 build_filename(opt, blacklist=['lr_schedule','retrain','step', \
-                            'ratio','freq','v','dataset', 'augment', 'd',
+                            'ratio','f','v','dataset', 'augment', 'd',
                             'depth', 'widen'])
 create_logger(opt)
 pprint(opt)
@@ -188,7 +187,7 @@ def val(e, data_loader):
 
 for e in xrange(opt['B']):
     train(e)
-    if e % opt['freq'] == opt['freq'] -1:
+    if e % opt['f'] == opt['f'] -1:
         val(e, val_loader)
     #save(model, opt)
 
