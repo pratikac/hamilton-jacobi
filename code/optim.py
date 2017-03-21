@@ -70,7 +70,8 @@ class ESGD(Optimizer):
 
         defaults = dict(lr=0.01, momentum=0, damp=0,
                  weight_decay=0, nesterov=True,
-                 L=0, eps=1e-4, g0=1e-2, g1=0)
+                 L=0, eps=1e-4, g0=1e-2, g1=0, rho=0,
+                 verbose=False)
         for k in defaults:
             if config.get(k, None) is None:
                 config[k] = defaults[k]
@@ -83,8 +84,14 @@ class ESGD(Optimizer):
                 'attach closure for Entropy-SGD, model and criterion'
         mf,merr = closure()
         
+        state = self.state
         c = self.config
+
+        if not 'N' in state:
+            state['N'] = models.num_parameters(model)
+
         lr = c['lr']
+        rho = c['rho']
         mom = c['momentum']
         wd = c['weight_decay']
         damp = c['damp']
@@ -93,78 +100,79 @@ class ESGD(Optimizer):
         eps = c['eps']
         g0 = c['g0']
         g1 = c['g1']
+        verbose = c['verbose']
+        llr, beta1 = 0.1, 0.75
 
-        # only deal with the basic group?
-        params = self.param_groups[0]['params']
 
-        state = self.state
-        # initialize
         if not 't' in state:
             state['t'] = 0
-            state['wc'], state['mdw'] = [], []
-            for w in params:
-                state['wc'].append(deepcopy(w.data))
-                state['mdw'].append(deepcopy(w.grad.data))
+            N = state['N']
+            tmp = th.FloatTensor(N).cuda()
+            state['wc'] = tmp.clone()
+            state['dwc'] = tmp.clone()
+            state['dw'] = tmp.clone().zero_()
 
-            state['sgld'] = dict(mw=deepcopy(state['wc']),
-                                    mdw=deepcopy(state['mdw']),
-                                    eta=deepcopy(state['mdw']),
-                                    lr = 0.1,
-                                    beta1 = 0.75)
+            state['cache'] = {}
+            cache = state['cache']
+            cache['w'] = tmp.clone().zero_()
+            cache['dw'] = tmp.clone().zero_()
+            cache['mw'] = tmp.clone().zero_()
 
-        lp = state['sgld']
-        for i,w in enumerate(params):
-            state['wc'][i].copy_(w.data)
-            lp['mw'][i].copy_(w.data)
-            lp['mdw'][i].zero_()
-            lp['eta'][i].normal_()
+            state['eta'] = tmp.clone()
+            state['mdw'] = tmp.clone().zero_()
 
-        state['debug'] = dict(wwpd=0, df=0, dF=0, g=0, eta=0)        
-        llr, beta1 = lp['lr'], lp['beta1']
+        state['t'] += 1
+        flatten_params(model, state['wc'], state['dwc'])
+
         g = g0*(1+g1)**state['t']
 
+        cache = state['cache']
+        w, dw, mw = cache['w'], cache['dw'], cache['mw']
+        eta = state['eta']
+
+        w.copy_(state['wc'])
+        mw.copy_(state['wc'])
+
+        cf = 0
         for i in xrange(L):
-            f,_ = closure()
-            for wc,w,mw,mdw,eta in zip(state['wc'], params, \
-                                    lp['mw'], lp['mdw'], lp['eta']):
-                dw = w.grad.data
+            dw.zero_()
+            unflatten_params(model, w)
+            cf, cerr = closure()
+            flatten_params(model, w, dw)
 
-                if wd != 0:
-                    dw.add_(wd, w.data)
-                if mom != 0:
-                    mdw.mul_(mom).add_(1-damp, dw)
-                    if nesterov:
-                        dw.add_(mom, mdw)
-                    else:
-                        dw = mdw
+            eta.normal_()
+            dw.add_(g, w - state['wc']).add_(eps/np.sqrt(0.5*llr), eta)
 
-                # add noise
-                eta.normal_()
-                dw.add_(-g, wc-w.data).add_(eps/np.sqrt(0.5*llr), eta)
+            w.add_(-llr, dw)
+            mw.mul_(beta1).add_(1-beta1, w)
 
-                # update weights
-                w.data.add_(-llr, dw)
-                mw.mul_(beta1).add_(1-beta1, w.data)
-
+        dw = state['dw'].zero_()
         if L > 0:
-            # copy model back
-            for i,w in enumerate(params):
-                w.data.copy_(state['wc'][i])
-                w.grad.data.copy_(w.data-lp['mw'][i])
+            if rho > 0:
+                dw.add_(rho, state['dwc'])
+            dw.add_(state['wc'] - mw)
+        else:
+            dw.add_(state['dwc'])
 
-        for w,mdw,mw in zip(params, state['mdw'], lp['mw']):
-            dw = w.grad.data
+        if verbose and state['t'] % 100 == 0:
+            debug = dict(dw=dw.norm(), dwc=state['dwc'].norm(),
+                dwdwc=th.dot(dw, state['dwc'])/dw.norm()/state['dwc'].norm(),
+                f=cf, g=g)
+            print {k : round(v, 4) for k,v in debug.items()}
 
-            if wd > 0:
-                dw.add_(wd, w.data)
-            if mom > 0:
-                mdw.mul_(mom).add_(1-damp, dw)
+        if wd > 0:
+            dw.add_(wd, state['wc'])
+        if mom > 0:
+            state['mdw'].mul_(mom).add_(1-damp, dw)
             if nesterov:
-                dw.add_(mom, mdw)
+                dw.add_(mom, state['mdw'])
             else:
-                dw = mdw
-            
-            w.data.add_(-lr, dw)
+                dw = state['mdw']
+
+        w = state['wc']
+        w.add_(-lr, dw)
+        unflatten_params(model, w)
+        mf,merr = closure()
 
         return mf,merr
 
