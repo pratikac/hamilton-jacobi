@@ -24,7 +24,6 @@ class mnistfc(nn.Module):
 
         self.m = nn.Sequential(
             View(784),
-            nn.Dropout(0.2),
             nn.Linear(784,c),
             nn.ReLU(True),
             nn.Dropout(opt['d']),
