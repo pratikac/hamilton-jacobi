@@ -68,7 +68,7 @@ if not opt['retrain'] == '':
 build_filename(opt, blacklist=['lr_schedule','retrain','step', \
                             'ratio','freq','v','dataset', 'augment', 'd',
                             'depth', 'widen'])
-logger = create_logger(opt)
+create_logger(opt)
 pprint(opt)
 
 def schedule(e):
@@ -85,7 +85,7 @@ def schedule(e):
     lr = lrs[idx][1]
 
     print('[LR]: ', lr)
-    logger.info('[LR] %.5f'%lr)
+    logging.info('[LR] %.5f'%lr)
     optimizer.config['lr'] = lr
 
 def train(e):
@@ -123,14 +123,14 @@ def train(e):
         top1.update(err, bsz)
 
         s = dict(i=bi + e*maxb, e=e, f=f, top1=err)
-        logger.info(json.dumps(s))
+        logging.info(json.dumps(s))
 
         if bi % 100 == 0 and bi != 0:
             print((color('blue', '[%2d][%4d/%4d] %2.4f %2.2f%%'))%(e,bi,maxb,
                 fs.avg, top1.avg))
 
     s = dict(e=e, i=0, f=fs.avg, top1=top1.avg)
-    logger.info(json.dumps(s))
+    logging.info(json.dumps(s))
 
     print(  (color('blue', '++[%2d] %2.4f %2.2f%% [%.2fs]'))% (e,
             fs.avg, top1.avg, timer()-ts))
@@ -181,7 +181,7 @@ def val(e, data_loader):
         top1.update(err, bsz)
 
     s = dict(e=e, i=0, f=fs.avg, top1=top1.avg)
-    logger.info(json.dumps(s))
+    logging.info(json.dumps(s))
     print((color('red', '**[%2d] %2.4f %2.4f%%\n'))%(e, fs.avg, top1.avg))
     print('')
 

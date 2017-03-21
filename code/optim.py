@@ -259,6 +259,8 @@ class HJB(Optimizer):
     def step(self, closure=None, model=None, criterion=None):
         assert (closure is not None) and (model is not None) and (criterion is not None), \
                 'attach closure for EntropySGDControl, model and criterion'
+        assert self.config['L'] > 0, 'L = 0'
+
         mf,merr = closure()
         
         c = self.config
@@ -379,6 +381,8 @@ class PME(Optimizer):
     def step(self, closure=None, model=None, criterion=None):
         assert (closure is not None) and (model is not None) and (criterion is not None), \
                 'attach closure for PME, model and criterion'
+        assert self.config['L'] > 0, 'L = 0'
+
         mf,merr = closure()
 
         state = self.state
@@ -485,6 +489,8 @@ class FB(Optimizer):
     def step(self, closure=None, model=None, criterion=None):
         assert (closure is not None) and (model is not None) and (criterion is not None), \
                 'attach closure for FB, model and criterion'
+        assert self.config['L'] > 0, 'L = 0'
+
         mf,merr = closure()
 
         state = self.state
@@ -597,6 +603,8 @@ class ESGDAVG(Optimizer):
     def step(self, closure=None, model=None, criterion=None):
         assert (closure is not None) and (model is not None) and (criterion is not None), \
                 'attach closure for LL, model and criterion'
+        assert self.config['L'] > 0, 'L = 0'
+
         mf,merr = closure()
 
         state = self.state
@@ -711,6 +719,8 @@ class LL(Optimizer):
     def step(self, closure=None, model=None, criterion=None):
         assert (closure is not None) and (model is not None) and (criterion is not None), \
                 'attach closure for LL, model and criterion'
+        assert self.config['L'] > 0, 'L = 0'
+
         mf,merr = closure()
 
         state = self.state
@@ -858,6 +868,8 @@ class PMELAP(Optimizer):
     def step(self, closure=None, model=None, criterion=None):
         assert (closure is not None) and (model is not None) and (criterion is not None), \
                 'attach closure for PMELAP, model and criterion'
+        assert self.config['L'] > 0, 'L = 0'
+
         mf,merr = closure()
 
         state = self.state
@@ -891,12 +903,8 @@ class PMELAP(Optimizer):
             cache = state['cache']
             cache['f'], cache['fm'], cache['fmm'] = 0, 0, 0
 
-            cache['w'] = tmp.clone().zero_()
-            cache['dw'] = tmp.clone().zero_()
-            cache['wm'] = tmp.clone().zero_()
-            cache['dwm'] = tmp.clone().zero_()
-            cache['wmm'] = tmp.clone().zero_()
-            cache['dwmm'] = tmp.clone().zero_()
+            for s in ['w', 'dw', 'wm', 'wmm', 'dwm', 'dwmm']:
+                cache[s] = tmp.clone().zero_()
 
             state['dw'] = tmp.clone().zero_()
             state['eta'] = tmp.clone()
@@ -908,17 +916,23 @@ class PMELAP(Optimizer):
         g = g0*(1+g1)**state['t']
 
         cache = state['cache']
-        w = cache['w']
-        dw = cache['dw']
+
+        w, wm, wmm = cache['w'], cache['wm'], cache['wmm']
+        dw, dwm, dwmm = cache['dw'], cache['dwm'], cache['dwmm']
+
         eta = state['eta']
 
         w.copy_(state['wc'])
-        state['dw'].zero_()
+        wm.copy_(state['wc'])
+        wmm.copy_(state['wc'])
 
+        dw.copy_(state['dwc'])
+        dwm.copy_(state['dwc'])
+        dwmm.copy_(state['dwc'])
+
+        state['dw'].zero_()
         llr = 0.1
-        for i in xrange(L):
-            w, wm, wmm = cache['w'], cache['wm'], cache['wmm']
-            dw, dwm, dwmm = cache['dw'], cache['dwm'], cache['dwmm']
+        for i in xrange(L+3):
 
             # update the cache
             dwmm.copy_(dwm)
@@ -933,8 +947,10 @@ class PMELAP(Optimizer):
             cache['f'], cerr = closure()
             flatten_params(model, w, dw)
 
-            h = (w-wmm).norm()/2.
-            state['dw'].add_(1/h**2, dw-dwm).add_(-1/h**2, dwm-dwmm)
+            if i > 3:
+                h = 1. #(w-wmm).norm()/2        (cancel with dt)
+                state['dw'].add_(1/h**2*(Mp-cache['f'])**(m-1), dw-dwm)
+                state['dw'].add_(-1/h**2*(Mp-cache['fm'])**(m-1), dwm-dwmm)
 
             eta.normal_()
             dw.add_(-g, w-state['wc']).add_(eps/np.sqrt(0.5*llr), eta)
@@ -942,6 +958,7 @@ class PMELAP(Optimizer):
 
         dw = state['dw']
         dw.mul_(1./float(L))
+        dw.add_(state['dwc'])
 
         if verbose and state['t'] % 100 == 0:
             debug = dict(dw=dw.norm(), dwc=state['dwc'].norm(),
