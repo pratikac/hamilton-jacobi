@@ -340,6 +340,7 @@ class FB(Optimizer):
             state['wc'] = th.FloatTensor(N).cuda()
             state['dwc'] = th.FloatTensor(N).cuda()
             state['p'] = th.FloatTensor(N).cuda()
+            state['dw'] = th.FloatTensor(N).cuda()
 
             state['cache'] = {}
             state['cache']['w'] = th.FloatTensor(N).cuda().zero_()
@@ -353,33 +354,43 @@ class FB(Optimizer):
         wcn, dwcn = state['wc'].norm(), state['dwc'].norm()
 
         g = g0*(1+g1)**state['t']
-        dt = 1./g
+        dt = g
 
         w = state['cache']['w']
-        p = state['p']
         cache_w = state['cache']['w'].mul_(0)
         cache_dw = state['cache']['dw'].mul_(0)
 
         state['p'].normal_().mul_(1/np.sqrt(N))*dwcn
-        cf = 0
+        p = state['p']
 
+        llr = 0.1
+        cf = 0
+        pn1, pn2 = 0, 0
         for i in xrange(int(L/2)):
             w.copy_(state['wc'])
             w.add_(dt, p)
             unflatten_params(model, w)
+
+            cache_dw.zero_()
             cf, cerr = closure()
             flatten_params(model, cache_w, cache_dw)
-            p.copy_(cache_dw)
+            #cache_dw.add_(g, w)
+            p.add_(llr, cache_dw)
+            pn1 = p.norm()
 
         for i in xrange(int(L/2)):
             w.copy_(state['wc'])
             w.add_(-dt/2., p)
             unflatten_params(model, w)
+
+            cache_dw.zero_()
             cf, cerr = closure()
             flatten_params(model, cache_w, cache_dw)
-            p.copy_(cache_dw)
+            #cache_dw.add_(-g, w)
+            p.add_(llr, cache_dw)
+            pn2 = p.norm()
 
-        dw = state['dwc'].zero_()
+        dw = state['dw'].zero_()
         dw.add_(p)
 
         if verbose and state['t'] % 100 == 0:
@@ -387,7 +398,8 @@ class FB(Optimizer):
                 dwdwc=th.dot(dw, state['dwc'])/dw.norm()/state['dwc'].norm(),
                 f=cf, wc=wcn,
                 g=g,
-                dt=dt)
+                dt=dt,
+                pn1=pn1, pn2=pn2)
             print {k : round(v, 4) for k,v in debug.items()}
 
         if wd > 0:

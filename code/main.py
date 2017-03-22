@@ -100,7 +100,7 @@ def train(e):
 
     for bi in xrange(maxb):
         def helper():
-            def feval():
+            def feval(bprop=True):
                 x,y = next(train_loader)
                 x, y = Variable(x.cuda()), Variable(y.squeeze().cuda())
                 bsz = x.size(0)
@@ -108,7 +108,8 @@ def train(e):
                 optimizer.zero_grad()
                 yh = model(x)
                 f = criterion.forward(yh, y)
-                f.backward()
+                if bprop:
+                    f.backward()
 
                 prec1, = accuracy(yh.data, y.data, topk=(1,))
                 err = 100.-prec1[0]

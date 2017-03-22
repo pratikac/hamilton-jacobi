@@ -119,6 +119,11 @@ class allcnn(nn.Module):
         opt['d'] = 0.5
         opt['l2'] = 1e-3
 
+        if opt['dataset'] == 'cifar10':
+            num_classes = 10
+        elif opt['dataset'] == 'cifar100':
+            num_classes = 100
+
         def convbn(ci,co,ksz,s=1,pz=0):
             return nn.Sequential(
                 nn.Conv2d(ci,co,ksz,stride=s,padding=pz),
@@ -136,9 +141,9 @@ class allcnn(nn.Module):
             nn.Dropout(opt['d']),
             convbn(c2,c2,3,1,1),
             convbn(c2,c2,3,1,1),
-            convbn(c2,10,1,1),
+            convbn(c2,num_classes,1,1),
             nn.AvgPool2d(8),
-            View(10))
+            View(num_classes))
 
         s = '[%s] Num parameters: %d'%(self.name, num_parameters(self.m))
         print(s)
