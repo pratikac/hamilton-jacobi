@@ -39,7 +39,10 @@ for v in product(*values):
     p = dict(zip(keys,v))
     s = ''
     for k in p:
-        s += ' --'+k+' '+str(p[k])
+        if len(k) > 1:
+            s += ' --'+k+' '+str(p[k])
+        else:
+            s += ' -'+k+' '+str(p[k])
 
     c = cmd+s
     c = c + (' -l -g %d')%(gs[len(cmds)%len(gs)])
