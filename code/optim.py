@@ -348,7 +348,6 @@ class FB(Optimizer):
 
             state['mdw'] = th.FloatTensor(N).cuda().zero_()
 
-
         state['t'] += 1
         flatten_params(model, state['wc'], state['dwc'])
         wcn, dwcn = state['wc'].norm(), state['dwc'].norm()
@@ -374,7 +373,6 @@ class FB(Optimizer):
             cache_dw.zero_()
             cf, cerr = closure()
             flatten_params(model, cache_w, cache_dw)
-            #cache_dw.add_(g, w)
             p.add_(llr, cache_dw)
             pn1 = p.norm()
 
@@ -386,7 +384,6 @@ class FB(Optimizer):
             cache_dw.zero_()
             cf, cerr = closure()
             flatten_params(model, cache_w, cache_dw)
-            #cache_dw.add_(-g, w)
             p.add_(llr, cache_dw)
             pn2 = p.norm()
 
@@ -533,7 +530,7 @@ class LL(Optimizer):
         dw.copy_(state['wc'] - state['cache']['y'])
         dw.add_(1, state['wc'] - state['cache']['z'])
 
-        if verbose and state['t'] % 10 == 0:
+        if verbose and state['t'] % 100 == 0:
             debug = dict(dw=dw.norm(), dwc=state['dwc'].norm(),
                 dwdwc=th.dot(dw, state['dwc'])/dw.norm()/state['dwc'].norm(),
                 f=cf,
