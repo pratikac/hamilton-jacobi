@@ -2,7 +2,6 @@ import torch as th
 import torch.nn as nn
 import math, logging, pdb
 
-
 class View(nn.Module):
     def __init__(self,o):
         super(View, self).__init__()
@@ -208,7 +207,6 @@ class wideresnet(nn.Module):
                 View(nc[3]),
                 nn.Linear(nc[3], num_classes))
 
-        # initialize weights
         for m in self.m.modules():
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0]*m.kernel_size[1]*m.out_channels

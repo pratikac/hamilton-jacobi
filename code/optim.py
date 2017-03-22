@@ -20,132 +20,14 @@ def unflatten_params(model, fw):
         w.data.copy_(fw[idx:idx + w.nelement()]).view(w.size())
         idx += w.nelement()
 
-class SGD(Optimizer):
-    def __init__(self, params, config = {}):
-
-        defaults = dict(lr=0.01, momentum=0, dampening=0,
-             weight_decay=0, nesterov=True)
-        for k in defaults:
-            if config.get(k, None) is None:
-                config[k] = defaults[k]
-
-        super(SGD, self).__init__(params, config)
-        self.config = config
-
-    def step(self, closure=None, model=None, criterion=None):
-        loss, err = closure()
-
-        c = self.config
-        wd = c['weight_decay']
-        mom = c['momentum']
-        damp = c['dampening']
-        nesterov = c['nesterov']
-        lr = c['lr']
-
-        for w in self.param_groups[0]['params']:
-            dw = w.grad.data
-
-            if wd > 0:
-                dw.add_(wd, w.data)
-            if mom > 0:
-                state = self.state[id(w)]
-                if 'mdw' not in state:
-                    state['mdw'] = dw.clone()
-                buf = state['mdw']
-                buf.mul_(mom).add(1-damp, dw)
-
-                if nesterov:
-                    dw.add_(mom, buf)
-                else:
-                    dw = buf
-
-            w.data.add_(-lr, dw)
-
-        return loss, err
-
-class SGLD(Optimizer):
-    def __init__(self, params, config = {}):
-        defaults = dict(t=0, lr=0.1, momentum=0.9, dampening=0,
-                weight_decay=0, nesterov=True, eps=1e-4,
-                gamma=0.01, model_bias=False)
-
-        for k in defaults:
-            if config.get(k, None) is None:
-                config[k] = defaults[k]
-        super(SGLD, self).__init__(params, config)
-        self.config = config
-
-    def step(self, closure, model, criterion):
-        params = self.param_groups[0]['params']
-
-        c = self.config
-        lr, mom, wd, damp, nesterov, eps = c['lr'], c['momentum'], c['weight_decay'], \
-                                            c['dampening'], c['nesterov'], c['eps']
-
-        state = self.state
-        if not 't' in state:
-            state['t'] = 0
-            state['wc'], state['mdw'], state['eta'] = None, [], []
-            for w in params:
-                state['mdw'].append(deepcopy(w.grad.data))
-                state['eta'].append(deepcopy(w.grad.data))
-            
-            if c['model_bias']:
-                state['wc'] = deepcopy(self.param_groups[0]['params'])
-
-        if not c['model_bias']:
-            state['wc'] = params
-
-        f,err = closure()        
-        state['t'] += 1
-
-        debug = dict(w=0, dw=0, eta=0, dF=0, df=0, f=f)
-
-        for wc,w,mdw,eta in zip(state['wc'], params, state['mdw'], state['eta']):
-            debug['w'] += th.norm(w).data[0]
-
-            dw = w.grad.data
-            debug['df'] += th.norm(dw)
-
-            # add bias term
-            dw.add_(c['gamma'], (w-wc).data)
-            debug['dF'] += th.norm(wc-w).data[0]
-
-            if wd > 0:
-                dw.add_(wd, w.data)
-            if mom > 0:
-                mdw.mul_(mom).add_(1-damp, dw)
-                if nesterov:
-                    dw.add_(mom, mdw)
-                else:
-                    dw = mdw
-
-            debug['dw'] += th.norm(dw)
-            
-            # add noise
-            eta.normal_()
-            debug['eta'] += th.norm(eta)*eps/np.sqrt(0.5*lr)
-
-            dw.add_(eps/np.sqrt(0.5*lr), eta)            
-
-            # update weights
-            w.data.add_(-lr, dw)
-
-        if c['verbose'] and state['t'] % 100 == 0:
-            d = debug
-            print   ('t: %04d, f: %.2e, df: %.2e, dF: %.2e, dw: %.2e, eta: %.2e, w: %.2e')% \
-                    (state['t']/100, d['f'], d['df'], d['dF'], d['dw'], d['eta'], d['w'])
-
-        return f,err
-
 class ESGD(Optimizer):
     def __init__(self, params, config = {}):
 
-        defaults = dict(lr=0.01, momentum=0, damp=0,
+        defaults = dict(lr=0.1, momentum=0, damp=0,
                  weight_decay=0, nesterov=True,
                  L=0, eps=1e-4, g0=1e-2, g1=0, rho=0,
-                 verbose=False,
-                 mult=False, hjb=False)
+                 mult=False, hjb=False, sgld=False,
+                 verbose=False)
 
         for k in defaults:
             if config.get(k, None) is None:
@@ -158,7 +40,7 @@ class ESGD(Optimizer):
         assert (closure is not None) and (model is not None) and (criterion is not None), \
                 'attach closure for Entropy-SGD, model and criterion'
         mf,merr = closure()
-        
+
         state = self.state
         c = self.config
 
@@ -166,6 +48,8 @@ class ESGD(Optimizer):
             state['N'] = models.num_parameters(model)
 
         hjb = c['hjb']
+        sgld = c['sgld']
+
         lr = c['lr']
         rho = c['rho']
         mult = c['mult']
@@ -230,18 +114,22 @@ class ESGD(Optimizer):
                 dw.mul_((maxf-cf))
 
             w.add_(-llr, dw)
-    
+
             if not hjb:
                 mw.mul_(beta1).add_(1-beta1, w)
 
         dw = state['dw'].zero_()
-        
+
         if L > 0:
             if rho > 0:
                 dw.add_(rho, state['dwc'])
             dw.add_(state['wc'] - mw)
         else:
             dw.add_(state['dwc'])
+
+        if sgld:
+            eta.normal_()
+            dw.add_(eps/np.sqrt(0.5*lr), eta)
 
         if verbose and state['t'] % 100 == 0:
             debug = dict(dw=dw.norm(), dwc=state['dwc'].norm(),
@@ -265,10 +153,34 @@ class ESGD(Optimizer):
 
         return mf,merr
 
+class SGD(ESGD):
+    def __init__(self, params, config = {}):
+
+        defaults = dict(lr=0.1, momentum=0, dampening=0,
+             weight_decay=0, nesterov=True, L=0)
+        for k in defaults:
+            if config.get(k, None) is None:
+                config[k] = defaults[k]
+
+        super(SGD, self).__init__(params, config)
+        self.config = config
+
+class SGLD(ESGD):
+    def __init__(self, params, config = {}):
+
+        defaults = dict(lr=0.1, momentum=0, dampening=0,
+            weight_decay=0, nesterov=True, L=0, sgld=True)
+        for k in defaults:
+            if config.get(k, None) is None:
+                config[k] = defaults[k]
+
+        super(SGLD, self).__init__(params, config)
+        self.config = config
+
 class HJB(ESGD):
     def __init__(self, params, config = {}):
 
-        defaults = dict(lr=0.01, momentum=0, damp=0,
+        defaults = dict(lr=0.1, momentum=0, damp=0,
                  weight_decay=0, nesterov=True,
                  L=0, eps=1e-4, g0=1e-2, g1=0,
                  verbose=False,
@@ -283,7 +195,7 @@ class HJB(ESGD):
 class ESGDAVG(ESGD):
     def __init__(self, params, config = {}):
 
-        defaults = dict(lr=0.01, momentum=0, damp=0,
+        defaults = dict(lr=0.1, momentum=0, damp=0,
                  weight_decay=0, nesterov=True,
                  L=100, g0=1e-2, g1=0,
                  verbose=False,
@@ -299,7 +211,7 @@ class ESGDAVG(ESGD):
 class FB(Optimizer):
     def __init__(self, params, config = {}):
 
-        defaults = dict(lr=0.01, momentum=0, damp=0,
+        defaults = dict(lr=0.1, momentum=0, damp=0,
                  weight_decay=0, nesterov=True,
                  L=100, g0=1e-2, g1=0,
                  verbose=False)
@@ -419,7 +331,7 @@ class FB(Optimizer):
 class LL(Optimizer):
     def __init__(self, params, config = {}):
 
-        defaults = dict(lr=0.01, momentum=0, damp=0,
+        defaults = dict(lr=0.1, momentum=0, damp=0,
                  weight_decay=0, nesterov=True,
                  L=100, eps=1e-4, g0=1e-2, g1=0,
                  verbose=False)
@@ -557,7 +469,7 @@ class LL(Optimizer):
 class PME(Optimizer):
     def __init__(self, params, config = {}):
 
-        defaults = dict(lr=0.01, momentum=0, damp=0,
+        defaults = dict(lr=0.1, momentum=0, damp=0,
                  weight_decay=0, nesterov=True,
                  L=100, g0=1e-2, g1=0,
                  verbose=False)
@@ -615,7 +527,7 @@ class PME(Optimizer):
         wcn, dwcn = state['wc'].norm(), state['dwc'].norm()
 
         g = g0*(1+g1)**state['t']
-        h = np.sqrt(1./g)*dwcn
+        h = np.sqrt(g)*dwcn
         #dt = 1
         #beta = L*dt/h**2      # this is the discretization
         beta = 0.5
@@ -665,7 +577,7 @@ class PME(Optimizer):
 class PMELAP(Optimizer):
     def __init__(self, params, config = {}):
 
-        defaults = dict(lr=0.01, momentum=0, damp=0,
+        defaults = dict(lr=0.1, momentum=0, damp=0,
                  weight_decay=0, nesterov=True,
                  L=100, eps=1e-4, g0=1e-2, g1=0,
                  verbose=False)

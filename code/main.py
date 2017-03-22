@@ -15,7 +15,7 @@ from pprint import pprint
 opt = add_args([
 ['-o', '/local2/pratikac/results', 'output'],
 ['-m', 'lenet', 'lenet | mnistfc | allcnn | wideresnet'],
-['--optim', 'ESGD', 'ESGD | HJB | PME | FB | LL | PMEAVG'],
+['--optim', 'ESGD', 'ESGD | HJB | PME | FB | LL | PMEAVG | SGLD | SGD'],
 ['--dataset', 'mnist', 'mnist | rotmnist | cifar10 | cifar100'],
 ['--retrain', '', 'checkpoint'],
 ['-b', 128, 'batch_size'],
@@ -26,7 +26,7 @@ opt = add_args([
 ['--lr', 0.1, 'learning rate'],
 ['--lr_schedule', '', 'learning rate schedule'],
 ['--l2', 0.0, 'ell-2'],
-['-d', 0.0, 'Dropout'],
+['-d', 0.0, 'dropout'],
 ['-L', 0, 'sgld iterations'],
 ['--eps', 1e-4, 'sgld noise'],
 ['--g0', 1e-4, 'gamma'],
