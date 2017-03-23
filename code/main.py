@@ -43,7 +43,7 @@ if opt['l']:
     opt['f'] = 1
 
 th.set_num_threads(2)
-if opt['g'] in [0, 1, 2]:
+if opt['g'] in [0, 1]:
     th.cuda.set_device(opt['g'])
 random.seed(opt['s'])
 np.random.seed(opt['s'])
@@ -53,7 +53,7 @@ cudnn.benchmark = True
 
 train_loader, val_loader, test_loader = getattr(loader, opt['dataset'])(opt)
 model = getattr(models, opt['m'])(opt)
-if opt['g'] > 2:
+if opt['g'] > 1:
     model = th.nn.DataParallel(model)
 model = model.cuda()
 criterion = nn.CrossEntropyLoss().cuda()
