@@ -32,13 +32,13 @@ class sampler_t:
                     if r[i] == 1:
                         x[i] = np.fliplr(x[i])
 
-                    # pad using reflect to preserve color?
+                    # pad using reflect to preserve color
                     res = cv2.copyMakeBorder(x[i], p,p,p,p,
                             borderType=cv2.BORDER_REFLECT, value=0)
 
                     szx, szy = res.shape[:2]
                     sz1, sz2 = random.randint(0, szx-sz), random.randint(0, szy-sz)
-                    res = res[sz2:sz2+sz, sz1:sz1+sz]
+                    res = res[sz1:sz1+sz, sz2:sz2+sz]
                     res = res.reshape(x[i].shape)
 
                 x = x.transpose(0,3,1,2)
