@@ -62,6 +62,7 @@ class ESGD(Optimizer):
         g0 = c['g0']
         g1 = c['g1']
         verbose = c['verbose']
+
         llr, beta1 = 0.1, 0.75
 
         if not 't' in state:
@@ -95,7 +96,8 @@ class ESGD(Optimizer):
         mw.copy_(state['wc'])
 
         maxf = 3.0
-        Mp = mf
+        Mp = 1e3
+        falpha = 0
         cf = 0
         for i in xrange(L):
             dw.zero_()
@@ -103,20 +105,15 @@ class ESGD(Optimizer):
             cf, cerr = closure()
             flatten_params(model, w, dw)
 
-            if hjb:
-                falpha = cf + (w-state['wc']).norm()**2*g/2.
-                if falpha < Mp and i > 0:
-                    Mp = falpha
-                    mw.copy_(w)
-
             eta.normal_()
             dw.add_(g, w - state['wc']).add_(eps/np.sqrt(0.5*llr), eta)
+            if wd > 0:
+                dw.add_(wd, w)
+
             if mult:
                 dw.mul_((maxf-cf))
 
-            # also do momentum of inner loop
-            if wd > 0:
-                dw.add_(wd, w)
+            # also use momentum in inner loop
             if mom > 0:
                 cache['mdw'].mul_(mom).add_(1-damp, dw)
                 if nesterov:
@@ -127,6 +124,13 @@ class ESGD(Optimizer):
 
             if not hjb:
                 mw.mul_(beta1).add_(1-beta1, w)
+
+            if hjb:
+                # cf is stale value
+                falpha = cf + (w-state['wc']).norm()**2*g/2.
+                if falpha <= Mp:
+                    Mp = falpha
+                    mw.copy_(w)
 
         dw = state['dw'].zero_()
 
@@ -144,7 +148,7 @@ class ESGD(Optimizer):
         if verbose and state['t'] % 25 == 0:
             debug = dict(dw=dw.norm(), dwc=state['dwc'].norm(),
                 dwdwc=th.dot(dw, state['dwc'])/dw.norm()/state['dwc'].norm(),
-                f=cf, g=g)
+                f=cf, g=g, falpha=falpha)
             print {k : round(v, 4) for k,v in debug.items()}
 
         if wd > 0:
