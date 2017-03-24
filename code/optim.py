@@ -77,6 +77,7 @@ class ESGD(Optimizer):
             cache['w'] = tmp.clone().zero_()
             cache['dw'] = tmp.clone().zero_()
             cache['mw'] = tmp.clone().zero_()
+            cache['mdw'] = tmp.clone().zero_()
 
             state['eta'] = tmp.clone()
             state['mdw'] = tmp.clone().zero_()
@@ -94,7 +95,7 @@ class ESGD(Optimizer):
         mw.copy_(state['wc'])
 
         maxf = 3.0
-        Mp = 1e3
+        Mp = mf
         cf = 0
         for i in xrange(L):
             dw.zero_()
@@ -104,7 +105,7 @@ class ESGD(Optimizer):
 
             if hjb:
                 falpha = cf + (w-state['wc']).norm()**2*g/2.
-                if falpha <= Mp and i > 0:
+                if falpha < Mp and i > 0:
                     Mp = falpha
                     mw.copy_(w)
 
@@ -113,6 +114,15 @@ class ESGD(Optimizer):
             if mult:
                 dw.mul_((maxf-cf))
 
+            # also do momentum of inner loop
+            if wd > 0:
+                dw.add_(wd, w)
+            if mom > 0:
+                cache['mdw'].mul_(mom).add_(1-damp, dw)
+                if nesterov:
+                    dw.add_(mom, cache['mdw'])
+                else:
+                    dw = cache['mdw']
             w.add_(-llr, dw)
 
             if not hjb:
@@ -131,7 +141,7 @@ class ESGD(Optimizer):
             eta.normal_()
             dw.add_(eps/np.sqrt(0.5*lr), eta)
 
-        if verbose and state['t'] % 100 == 0:
+        if verbose and state['t'] % 25 == 0:
             debug = dict(dw=dw.norm(), dwc=state['dwc'].norm(),
                 dwdwc=th.dot(dw, state['dwc'])/dw.norm()/state['dwc'].norm(),
                 f=cf, g=g)
@@ -285,6 +295,8 @@ class FB(Optimizer):
             cache_dw.zero_()
             cf, cerr = closure()
             flatten_params(model, cache_w, cache_dw)
+            if wd > 0:
+                cache_dw.add_(wd, cache_w)
             p.add_(llr, cache_dw)
             pn1 = p.norm()
 
@@ -296,6 +308,8 @@ class FB(Optimizer):
             cache_dw.zero_()
             cf, cerr = closure()
             flatten_params(model, cache_w, cache_dw)
+            if wd > 0:
+                cache_dw.add_(wd, cache_w)
             p.add_(llr, cache_dw)
             pn2 = p.norm()
 
@@ -373,7 +387,7 @@ class LL(Optimizer):
             state['dwc'] = th.FloatTensor(N).cuda()
 
             state['cache'] = {}
-            for s in ['w', 'dw', 'y', 'z']:
+            for s in ['w', 'dw', 'mdw', 'y', 'z']:
                 state['cache'][s] = th.FloatTensor(N).cuda().zero_()
 
             state['dw'] = th.FloatTensor(N).cuda().zero_()
@@ -393,6 +407,7 @@ class LL(Optimizer):
         cf = 0
         Mm, Mp = -1e3, 1e3
 
+        cache = state['cache']
         w = state['cache']['w'].zero_()
         cache_dw = state['cache']['dw'].zero_()
         w.copy_(state['wc'])
@@ -414,6 +429,14 @@ class LL(Optimizer):
             eta.normal_()
             cache_dw.add_(eps/np.sqrt(0.5*llr), eta)
 
+            if wd > 0:
+                cache_dw.add_(wd, w)
+            if mom > 0:
+                cache['mdw'].mul_(mom).add_(1-damp, cache_dw)
+                if nesterov:
+                    cache_dw.add_(mom, cache['mdw'])
+                else:
+                    cache_dw = cache['mdw']
             w.add_(-llr, cache_dw)
 
         w = state['cache']['w'].zero_()
@@ -436,6 +459,14 @@ class LL(Optimizer):
             eta.normal_()
             cache_dw.add_(eps/np.sqrt(0.5*llr), eta)
 
+            if wd > 0:
+                cache_dw.add_(wd, w)
+            if mom > 0:
+                cache['mdw'].mul_(mom).add_(1-damp, cache_dw)
+                if nesterov:
+                    cache_dw.add_(mom, cache['mdw'])
+                else:
+                    cache_dw = cache['mdw']
             w.add_(-llr, cache_dw)
 
         # copy grad in

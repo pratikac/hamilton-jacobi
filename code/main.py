@@ -35,7 +35,8 @@ opt = add_args([
 ['-g', 0, 'gpu idx'],
 ['-l', False, 'log'],
 ['-f', 10, 'print freq'],
-['-v', False, 'verbose']
+['-v', False, 'verbose'],
+['--save', False, 'save network']
 ])
 if opt['L'] > 0:
     opt['f'] = 1
@@ -68,7 +69,7 @@ if not opt['retrain'] == '':
 
 build_filename(opt, blacklist=['lr_schedule','retrain','step', \
                             'ratio','f','v','dataset', 'augment', 'd',
-                            'depth', 'widen'])
+                            'depth', 'widen','save'])
 logger = create_logger(opt)
 pprint(opt)
 
@@ -129,7 +130,7 @@ def train(e):
             s = dict(i=bi + e*maxb, e=e, f=f, top1=err)
             logger.info(json.dumps(s))
 
-        if bi % 100 == 0 and bi != 0:
+        if bi % 25 == 0 and bi != 0:
             print((color('blue', '[%2d][%4d/%4d] %2.4f %2.2f%%'))%(e,bi,maxb,
                 fs.avg, top1.avg))
 
@@ -155,6 +156,7 @@ def set_dropout(cache = None, p=0):
                 l.p = cache.pop(0)
 
 def dry_feed():
+    model.train()
     cache = set_dropout()
     maxb = len(train_loader)
     for bi in xrange(maxb):
@@ -195,7 +197,8 @@ for e in xrange(opt['B']):
     train(e)
     if e % opt['f'] == opt['f'] -1:
         val(e, val_loader)
-    #save(model, opt)
+    if opt['save']:
+        save(model, opt)
 
 # print(color('red', 'Test error: '))
 # val(e, test_loader)

@@ -101,9 +101,6 @@ def create_logger(opt, idx=0):
     return l
 
 def save(model, opt):
-    if not opt['l']:
-        return
-
     d = opt.get('o','/local2/pratikac/results')
     fn = os.path.join(d, opt['filename']+'.pz')
 
