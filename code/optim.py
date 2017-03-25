@@ -107,8 +107,9 @@ class ESGD(Optimizer):
                 dw.add_(wd, w)
 
             if ll and i > L/2:
-                # reverse quadratic term in LL loop
-                dw.add_(-0.5*g, w - state['wc'])
+                # reverse quadratic term in LL loop,
+                # but compute distance from the right place
+                dw.add_(-2*g, w - cache['y']*0.1 - state['wc']*0.9)
             else:
                 dw.add_(g, w - state['wc'])
 

@@ -25,9 +25,9 @@ def loadlog(f):
     opt = get_params_from_filename(f)
 
     for l in open(f):
-        if '[LOG]' in l:
+        if '[LOG]' in l[:5]:
             logs.append(json.loads(l[5:-1]))
-        elif '[SUMMARY]' in l:
+        elif '[SUMMARY]' in l[:8]:
             summary.append(json.loads(l[8:-1]))
         else:
             try:
@@ -63,5 +63,5 @@ def loaddir(dir, expr='*', old=True):
         d.append(di)
 
     d = pd.concat(d)
-    pickle.dump(d, open(, 'w'))
+    pickle.dump(d, open(pkl, 'w'))
     return d

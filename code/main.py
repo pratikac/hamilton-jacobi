@@ -95,7 +95,7 @@ def schedule(e):
 
     print('[LR]: ', lr)
     if opt['l']:
-        logger.info('[LR]' + json.dumps({'lr': lr}))
+        logger.info('[LR] ' + json.dumps({'lr': lr}))
     optimizer.config['lr'] = lr
 
 def train(e):
