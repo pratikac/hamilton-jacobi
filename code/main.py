@@ -17,9 +17,9 @@ opt = add_args([
 ['-m', 'lenet', 'lenet | mnistfc | allcnn | wideresnet'],
 ['--optim', 'ESGD', 'ESGD | HJB | PME | FB | LL | PMEAVG | SGLD | SGD'],
 ['--dataset', 'mnist', 'mnist | rotmnist | cifar10 | cifar100'],
-['--retrain', '', 'checkpoint'],
 ['-b', 128, 'batch_size'],
 ['--augment', False, 'data augmentation'],
+['-e', 0, 'start epoch'],
 ['-B', 100, 'Max epochs'],
 ['--depth', 16, 'ResNet depth'],
 ['--widen', 2, 'ResNet widen'],
@@ -36,6 +36,8 @@ opt = add_args([
 ['-l', False, 'log'],
 ['-f', 10, 'print freq'],
 ['-v', False, 'verbose'],
+['--retrain', '', 'checkpoint'],
+['--validate', '', 'validate a checkpoint'],
 ['--save', False, 'save network']
 ])
 if opt['L'] > 0:
@@ -62,14 +64,19 @@ optimizer = getattr(optim, opt['optim'])(model.parameters(),
         config = dict(lr=opt['lr'], momentum=0.9, nesterov=True, weight_decay=opt['l2'],
         L=opt['L'], eps=opt['eps'], g0=opt['g0'], g1=opt['g1'], verbose=opt['v']))
 
+ckpt = None
 if not opt['retrain'] == '':
     ckpt = th.load(opt['retrain'])
+if not opt['validate'] == '':
+    ckpt = th.load(opt['retrain'])
+
+if ckpt is not None:
     model.load_state_dict(ckpt['state_dict'])
-    print('Retraining model: %s'%ckpt['name'])
+    print('Loading model: %s'%ckpt['name'])
 
 build_filename(opt, blacklist=['lr_schedule','retrain','step', \
                             'ratio','f','v','dataset', 'augment', 'd',
-                            'depth', 'widen','save'])
+                            'depth', 'widen','save','e','validate','l2','eps'])
 logger = create_logger(opt)
 pprint(opt)
 
@@ -193,12 +200,12 @@ def val(e, data_loader):
     print((color('red', '**[%2d] %2.4f %2.4f%%\n'))%(e, fs.avg, top1.avg))
     print('')
 
-for e in xrange(opt['B']):
-    train(e)
-    if e % opt['f'] == opt['f'] -1:
-        val(e, val_loader)
-    if opt['save']:
-        save(model, opt, marker='e_%s'%e)
-
-# print(color('red', 'Test error: '))
-# val(e, test_loader)
+if opt['validate'] == '':
+    for e in xrange(opt['e'], opt['B']):
+        train(e)
+        if e % opt['f'] == opt['f'] -1:
+            val(e, val_loader)
+        if opt['save']:
+            save(model, opt, marker='e_%s'%e)
+else:
+    val(e, test_loader)

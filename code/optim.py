@@ -64,6 +64,8 @@ class ESGD(Optimizer):
         verbose = c['verbose']
 
         llr, beta1 = 0.1, 0.75
+        if hjb:
+            beta1 = 1e-4
 
         if not 't' in state:
             state['t'] = 0
@@ -102,15 +104,12 @@ class ESGD(Optimizer):
             unflatten_params(model, w)
             cf, cerr = closure()
             flatten_params(model, w, dw)
-
-            eta.normal_()
-            dw.add_(g, w - state['wc'])
-
-            if not hjb:
-                dw.add_(eps/np.sqrt(0.5*llr), eta)
-
             if wd > 0:
                 dw.add_(wd, w)
+
+            dw.add_(g, w - state['wc'])
+            eta.normal_()
+            dw.add_(eps/np.sqrt(0.5*llr), eta)
 
             if mult:
                 dw.mul_((maxf-cf))
@@ -124,12 +123,7 @@ class ESGD(Optimizer):
                     dw = cache['mdw']
             w.add_(-llr, dw)
 
-            if not hjb:
-                mw.mul_(beta1).add_(1-beta1, w)
-
-        # hjb only takes the final instead of the running average
-        if hjb:
-            mw.copy_(w)
+            mw.mul_(beta1).add_(1-beta1, w)
 
         dw = state['dw'].zero_()
         if L > 0:
@@ -143,7 +137,7 @@ class ESGD(Optimizer):
             eta.normal_()
             dw.add_(eps/np.sqrt(0.5*lr), eta)
 
-        if verbose and state['t'] % 5 == 0:
+        if verbose and state['t'] % 25 == 0:
             debug = dict(dw=dw.norm(), dwc=state['dwc'].norm(),
                 dwdwc=th.dot(dw, state['dwc'])/dw.norm()/state['dwc'].norm(),
                 f=cf, g=g)
