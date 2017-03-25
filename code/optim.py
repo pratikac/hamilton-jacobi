@@ -107,8 +107,8 @@ class ESGD(Optimizer):
                 dw.add_(wd, w)
 
             if ll and i > L/2:
-                # gradient ascent in the LL loop
-                dw.add_(-2*g, w - state['wc'])
+                # reverse quadratic term in LL loop
+                dw.add_(-0.5*g, w - state['wc'])
             else:
                 dw.add_(g, w - state['wc'])
 
@@ -118,6 +118,10 @@ class ESGD(Optimizer):
             if mult:
                 dw.mul_((maxf-cf))
 
+            # ascent for the later half
+            if ll and i > L/2:
+                dw.mul_(-0.1)
+
             if mom > 0:
                 cache['mdw'].mul_(mom).add_(1-damp, dw)
                 if nesterov:
@@ -125,23 +129,19 @@ class ESGD(Optimizer):
                 else:
                     dw = cache['mdw']
 
-            if not ll:
-                w.add_(-llr, dw)
-                mw.mul_(beta1).add_(1-beta1, w)
-            else:
+            w.add_(-llr, dw)
+            mw.mul_(beta1).add_(1-beta1, w)
+
+            if ll:
                 if i <= L/2:
-                    w.add_(-llr, dw)
-                    mw.mul_(beta1).add_(1-beta1, w)
                     cache['y'].copy_(mw)
                 else:
-                    w.add_(llr, dw)
-                    mw.mul_(beta1).add_(1-beta1, w)
                     cache['z'].copy_(mw)
 
         dw = state['dw'].zero_()
         if ll:
             dw.add_(state['wc'] - cache['y'])
-            dw.add_(-1, state['wc'] - cache['z'])
+            dw.add_(state['wc'] - cache['z'])
         else:
             if L > 0:
                 if rho > 0:
