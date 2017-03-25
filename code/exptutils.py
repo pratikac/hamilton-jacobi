@@ -94,15 +94,18 @@ def create_logger(opt, idx=0):
     l.info('STATUS %s'%r[1])
     l.info('DIFF %s'%r[2])
 
+    l.info('')
+    l.info('OPT')
     s = pprint.pformat(opt)
     l.info(s)
     l.info('')
 
     return l
 
-def save(model, opt):
+def save(model, opt, marker=''):
     d = opt.get('o','/local2/pratikac/results')
-    fn = os.path.join(d, opt['filename']+'.pz')
+    #fn = os.path.join(d, opt['filename']+'.pz')
+    fn = os.path.join(d, model.name+'_'+marker+'.pz')
 
     o = {   'state_dict': model.state_dict(),
             'name': model.name}

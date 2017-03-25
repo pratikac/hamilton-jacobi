@@ -198,7 +198,7 @@ for e in xrange(opt['B']):
     if e % opt['f'] == opt['f'] -1:
         val(e, val_loader)
     if opt['save']:
-        save(model, opt)
+        save(model, opt, marker='e_%s'%e)
 
 # print(color('red', 'Test error: '))
 # val(e, test_loader)

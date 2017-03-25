@@ -96,8 +96,6 @@ class ESGD(Optimizer):
         mw.copy_(state['wc'])
 
         maxf = 3.0
-        Mp = 1e3
-        falpha = 0
         cf = 0
         for i in xrange(L):
             dw.zero_()
@@ -106,7 +104,11 @@ class ESGD(Optimizer):
             flatten_params(model, w, dw)
 
             eta.normal_()
-            dw.add_(g, w - state['wc']).add_(eps/np.sqrt(0.5*llr), eta)
+            dw.add_(g, w - state['wc'])
+
+            if not hjb:
+                dw.add_(eps/np.sqrt(0.5*llr), eta)
+
             if wd > 0:
                 dw.add_(wd, w)
 
@@ -125,15 +127,11 @@ class ESGD(Optimizer):
             if not hjb:
                 mw.mul_(beta1).add_(1-beta1, w)
 
-            if hjb:
-                # cf is stale value
-                falpha = cf + (w-state['wc']).norm()**2*g/2.
-                if falpha <= Mp:
-                    Mp = falpha
-                    mw.copy_(w)
+        # hjb only takes the final instead of the running average
+        if hjb:
+            mw.copy_(w)
 
         dw = state['dw'].zero_()
-
         if L > 0:
             if rho > 0:
                 dw.add_(rho, state['dwc'])
@@ -145,10 +143,10 @@ class ESGD(Optimizer):
             eta.normal_()
             dw.add_(eps/np.sqrt(0.5*lr), eta)
 
-        if verbose and state['t'] % 25 == 0:
+        if verbose and state['t'] % 5 == 0:
             debug = dict(dw=dw.norm(), dwc=state['dwc'].norm(),
                 dwdwc=th.dot(dw, state['dwc'])/dw.norm()/state['dwc'].norm(),
-                f=cf, g=g, falpha=falpha)
+                f=cf, g=g)
             print {k : round(v, 4) for k,v in debug.items()}
 
         if wd > 0:
