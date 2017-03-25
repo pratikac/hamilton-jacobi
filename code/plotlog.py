@@ -4,12 +4,15 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-import os, sys, glob, pdb, re, json
+import os, sys, glob2, pdb, re, json
+import cPickle as pickle
 sns.set()
 
 colors = sns.color_palette("husl", 8)
 
-def get_params(s):
+whitelist = set(['s','m','lr','eps', 'g0', 'g1', 'L', 'optim'])
+
+def get_params_from_filename(s):
     t = s[s.rfind('/')+6:s.find('_opt_')]
     _s = s[s.find('_opt_')+5:-4]
     r = json.loads(_s)
@@ -17,31 +20,48 @@ def get_params(s):
     r['t'] = t
     return r
 
-def load(dir, expr='*'):
-    fs = sorted(glob.glob(dir + '/' + expr + '.log'))
-    for i in xrange(len(fs)):
-        print i, get_params(fs[i])
+def loadlog(f):
+    logs, summary = [], []
+    opt = get_params_from_filename(f)
 
-    D = [pd.read_csv(f, sep=None, engine='python') for f in fs]
-    df = pd.concat(D, keys=[i for i in xrange(len(D))])
-
-    return [get_params(f) for f in fs], df
-
-def loadlog(f, w={}):
-    log,summary = [], []
-    opt = {}
     for l in open(f):
-        r = l.find('| [OPT]')
-        if r > -1:
-            opt = json.loads(l[r+8:-1])
-            print opt
-            continue
-        r = l.find('| [LOG]')
-        if r > -1:
-            log.append(json.loads(l[r+8:-1]))
-            continue
-        r = l.find('| [SUMMARY]')
-        if r > -1:
-            summary.append(json.loads(l[r+12:-1]))
-            continue
-    return opt, pd.DataFrame(log), pd.DataFrame(summary)
+        if '[LOG]' in l:
+            logs.append(json.loads(l[5:-1]))
+        elif '[SUMMARY]' in l:
+            summary.append(json.loads(l[8:-1]))
+        else:
+            try:
+                s = json.loads(l)
+            except:
+                continue
+            if s['i'] == 0:
+                if not 'val' in s:
+                    s['train'] = True
+                summary.append(s)
+            else:
+                logs.append(s)
+    return opt, logs, summary
+
+def loaddir(dir, expr='*', old=True):
+    pkl = dir+'/log.p'
+
+    if os.path.isfile(pkl):
+        return pickle.load(open(pkl, 'r'))
+
+    fs = sorted(glob2.glob(dir + '/**/' + expr + '.log'))
+    d = []
+
+    for i in xrange(len(fs)):
+        print i, get_params_from_filename(fs[i])
+
+    for f in fs:
+        o, l, s = loadlog(f)
+
+        di = pd.DataFrame(l + s)
+        for k in o:
+            di[k] = o[k]
+        d.append(di)
+
+    d = pd.concat(d)
+    pickle.dump(d, open(, 'w'))
+    return d

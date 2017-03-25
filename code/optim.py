@@ -26,7 +26,7 @@ class ESGD(Optimizer):
         defaults = dict(lr=0.1, momentum=0, damp=0,
                  weight_decay=0, nesterov=True,
                  L=0, eps=1e-4, g0=1e-2, g1=0, rho=0,
-                 mult=False, hjb=False, sgld=False,
+                 mult=False, hjb=False, sgld=False, ll=False,
                  verbose=False)
 
         for k in defaults:
@@ -49,6 +49,7 @@ class ESGD(Optimizer):
 
         hjb = c['hjb']
         sgld = c['sgld']
+        ll = c['ll']
 
         lr = c['lr']
         rho = c['rho']
@@ -64,7 +65,7 @@ class ESGD(Optimizer):
         verbose = c['verbose']
 
         llr, beta1 = 0.1, 0.75
-        if hjb:
+        if hjb or ll:
             beta1 = 1e-4
 
         if not 't' in state:
@@ -77,10 +78,8 @@ class ESGD(Optimizer):
 
             state['cache'] = {}
             cache = state['cache']
-            cache['w'] = tmp.clone().zero_()
-            cache['dw'] = tmp.clone().zero_()
-            cache['mw'] = tmp.clone().zero_()
-            cache['mdw'] = tmp.clone().zero_()
+            for k in ['w', 'dw', 'mw', 'mdw', 'y', 'z']:
+                state['cache'][k] = tmp.clone().zero_()
 
             state['eta'] = tmp.clone()
             state['mdw'] = tmp.clone().zero_()
@@ -107,31 +106,49 @@ class ESGD(Optimizer):
             if wd > 0:
                 dw.add_(wd, w)
 
-            dw.add_(g, w - state['wc'])
+            if ll and i > L/2:
+                # gradient ascent in the LL loop
+                dw.add_(-2*g, w - state['wc'])
+            else:
+                dw.add_(g, w - state['wc'])
+
             eta.normal_()
             dw.add_(eps/np.sqrt(0.5*llr), eta)
 
             if mult:
                 dw.mul_((maxf-cf))
 
-            # also use momentum in inner loop
             if mom > 0:
                 cache['mdw'].mul_(mom).add_(1-damp, dw)
                 if nesterov:
                     dw.add_(mom, cache['mdw'])
                 else:
                     dw = cache['mdw']
-            w.add_(-llr, dw)
 
-            mw.mul_(beta1).add_(1-beta1, w)
+            if not ll:
+                w.add_(-llr, dw)
+                mw.mul_(beta1).add_(1-beta1, w)
+            else:
+                if i <= L/2:
+                    w.add_(-llr, dw)
+                    mw.mul_(beta1).add_(1-beta1, w)
+                    cache['y'].copy_(mw)
+                else:
+                    w.add_(llr, dw)
+                    mw.mul_(beta1).add_(1-beta1, w)
+                    cache['z'].copy_(mw)
 
         dw = state['dw'].zero_()
-        if L > 0:
-            if rho > 0:
-                dw.add_(rho, state['dwc'])
-            dw.add_(state['wc'] - mw)
+        if ll:
+            dw.add_(state['wc'] - cache['y'])
+            dw.add_(-1, state['wc'] - cache['z'])
         else:
-            dw.add_(state['dwc'])
+            if L > 0:
+                if rho > 0:
+                    dw.add_(rho, state['dwc'])
+                dw.add_(state['wc'] - mw)
+            else:
+                dw.add_(state['dwc'])
 
         if sgld:
             eta.normal_()
@@ -162,7 +179,7 @@ class ESGD(Optimizer):
 class SGD(ESGD):
     def __init__(self, params, config = {}):
 
-        defaults = dict(lr=0.1, momentum=0, dampening=0,
+        defaults = dict(lr=0.1, momentum=0.9, dampening=0,
              weight_decay=0, nesterov=True, L=0)
         for k in defaults:
             if config.get(k, None) is None:
@@ -174,7 +191,7 @@ class SGD(ESGD):
 class SGLD(ESGD):
     def __init__(self, params, config = {}):
 
-        defaults = dict(lr=0.1, momentum=0, dampening=0,
+        defaults = dict(lr=0.1, momentum=0.9, dampening=0,
             weight_decay=0, nesterov=True, L=0, sgld=True)
         for k in defaults:
             if config.get(k, None) is None:
@@ -186,7 +203,7 @@ class SGLD(ESGD):
 class HJB(ESGD):
     def __init__(self, params, config = {}):
 
-        defaults = dict(lr=0.1, momentum=0, damp=0,
+        defaults = dict(lr=0.1, momentum=0.9, damp=0,
                  weight_decay=0, nesterov=True,
                  L=0, eps=1e-4, g0=1e-2, g1=0,
                  verbose=False,
@@ -201,7 +218,7 @@ class HJB(ESGD):
 class ESGDAVG(ESGD):
     def __init__(self, params, config = {}):
 
-        defaults = dict(lr=0.1, momentum=0, damp=0,
+        defaults = dict(lr=0.1, momentum=0.9, damp=0,
                  weight_decay=0, nesterov=True,
                  L=100, g0=1e-2, g1=0,
                  verbose=False,
@@ -338,160 +355,20 @@ class FB(Optimizer):
 
         return mf,merr
 
-class LL(Optimizer):
+class LL(ESGD):
     def __init__(self, params, config = {}):
 
-        defaults = dict(lr=0.1, momentum=0, damp=0,
+        defaults = dict(lr=0.1, momentum=0.9, damp=0,
                  weight_decay=0, nesterov=True,
                  L=100, eps=1e-4, g0=1e-2, g1=0,
-                 verbose=False)
+                 verbose=False,
+                 ll=True)
         for k in defaults:
             if config.get(k, None) is None:
                 config[k] = defaults[k]
 
         super(LL, self).__init__(params, config)
         self.config = config
-
-    def step(self, closure=None, model=None, criterion=None):
-        assert (closure is not None) and (model is not None) and (criterion is not None), \
-                'attach closure for LL, model and criterion'
-        assert self.config['L'] > 0, 'L = 0'
-
-        mf,merr = closure()
-
-        state = self.state
-        c = self.config
-
-        if not 'N' in state:
-            state['N'] = models.num_parameters(model)
-
-        lr = c['lr']
-        mom = c['momentum']
-        wd = c['weight_decay']
-        damp = c['damp']
-        nesterov = c['nesterov']
-        L = c['L']
-        eps = c['eps']
-        g0 = c['g0']
-        g1 = c['g1']
-        N = state['N']
-        verbose = c['verbose']
-
-        if not 't' in state:
-            state['t'] = 0
-            state['wc'] = th.FloatTensor(N).cuda()
-            state['dwc'] = th.FloatTensor(N).cuda()
-
-            state['cache'] = {}
-            for s in ['w', 'dw', 'mdw', 'y', 'z']:
-                state['cache'][s] = th.FloatTensor(N).cuda().zero_()
-
-            state['dw'] = th.FloatTensor(N).cuda().zero_()
-            state['mdw'] = th.FloatTensor(N).cuda().zero_()
-            state['eta'] = th.FloatTensor(N).cuda()
-
-        state['t'] += 1
-        flatten_params(model, state['wc'], state['dwc'])
-        wcn, dwcn = state['wc'].norm(), state['dwc'].norm()
-
-        g = g0*(1+g1)**state['t']
-
-        dw = state['dw'].zero_()
-        eta = state['eta']
-
-        llr = 0.1
-        cf = 0
-        Mm, Mp = -1e3, 1e3
-
-        cache = state['cache']
-        w = state['cache']['w'].zero_()
-        cache_dw = state['cache']['dw'].zero_()
-        w.copy_(state['wc'])
-
-        for i in xrange(int(L/2)):
-            cache_dw.zero_()
-            unflatten_params(model, w)
-            cf, cerr = closure()
-
-            falpha = cf + (w-state['wc']).norm()**2*g/2.
-            if falpha <= Mp and i > 0:
-                Mp = falpha
-                state['cache']['y'].copy_(w)
-
-            flatten_params(model, w, cache_dw)
-            cache_dw.add_(g, w-state['wc'])
-
-            # add noise
-            eta.normal_()
-            cache_dw.add_(eps/np.sqrt(0.5*llr), eta)
-
-            if wd > 0:
-                cache_dw.add_(wd, w)
-            if mom > 0:
-                cache['mdw'].mul_(mom).add_(1-damp, cache_dw)
-                if nesterov:
-                    cache_dw.add_(mom, cache['mdw'])
-                else:
-                    cache_dw = cache['mdw']
-            w.add_(-llr, cache_dw)
-
-        w = state['cache']['w'].zero_()
-        cache_dw = state['cache']['dw'].zero_()
-        w.copy_(state['wc'])
-
-        for i in xrange(int(L/2)):
-            cache_dw.zero_()
-            unflatten_params(model, w)
-            cf, cerr = closure()
-
-            falpha = cf - (w-state['wc']).norm()**2*g/2.
-            if Mm <= falpha and i > 0:
-                Mm = falpha
-                state['cache']['z'].copy_(w)
-
-            flatten_params(model, w, cache_dw)
-            cache_dw.add_(2*g, w-state['wc'])
-
-            eta.normal_()
-            cache_dw.add_(eps/np.sqrt(0.5*llr), eta)
-
-            if wd > 0:
-                cache_dw.add_(wd, w)
-            if mom > 0:
-                cache['mdw'].mul_(mom).add_(1-damp, cache_dw)
-                if nesterov:
-                    cache_dw.add_(mom, cache['mdw'])
-                else:
-                    cache_dw = cache['mdw']
-            w.add_(-llr, cache_dw)
-
-        # copy grad in
-        dw.copy_(state['wc'] - state['cache']['y'])
-        dw.add_(1, state['wc'] - state['cache']['z'])
-
-        if verbose and state['t'] % 100 == 0:
-            debug = dict(dw=dw.norm(), dwc=state['dwc'].norm(),
-                dwdwc=th.dot(dw, state['dwc'])/dw.norm()/state['dwc'].norm(),
-                f=cf,
-                g=g)
-            print {k : round(v, 4) for k,v in debug.items()}
-
-        if wd > 0:
-            dw.add_(wd, state['wc'])
-        if mom > 0:
-            state['mdw'].mul_(mom).add_(1-damp, dw)
-            if nesterov:
-                dw.add_(mom, state['mdw'])
-            else:
-                dw = state['mdw']
-
-        # update weights
-        w = state['wc']
-        w.add_(-lr, dw)
-        unflatten_params(model, w)
-        mf,merr = closure()
-
-        return mf,merr
 
 class PME(Optimizer):
     def __init__(self, params, config = {}):

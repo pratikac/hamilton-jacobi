@@ -95,7 +95,7 @@ def schedule(e):
 
     print('[LR]: ', lr)
     if opt['l']:
-        logger.info('[LR] %.5f'%lr)
+        logger.info('[LR]' + json.dumps({'lr': lr}))
     optimizer.config['lr'] = lr
 
 def train(e):
@@ -135,15 +135,16 @@ def train(e):
 
         if opt['l']:
             s = dict(i=bi + e*maxb, e=e, f=f, top1=err)
-            logger.info(json.dumps(s))
+            logger.info('[LOG] ' + json.dumps(s))
 
         if bi % 25 == 0 and bi != 0:
             print((color('blue', '[%2d][%4d/%4d] %2.4f %2.2f%%'))%(e,bi,maxb,
                 fs.avg, top1.avg))
 
     if opt['l']:
-        s = dict(e=e, i=0, f=fs.avg, top1=top1.avg)
-        logger.info(json.dumps(s))
+        s = dict(e=e, i=0, f=fs.avg, top1=top1.avg, train=True)
+        logger.info('[SUMMARY] ' + json.dumps(s))
+        logger.info('')
 
     print(  (color('blue', '++[%2d] %2.4f %2.2f%% [%.2fs]'))% (e,
             fs.avg, top1.avg, timer()-ts))
@@ -196,7 +197,9 @@ def val(e, data_loader):
 
     if opt['l']:
         s = dict(e=e, i=0, f=fs.avg, top1=top1.avg, val=True)
-        logger.info(json.dumps(s))
+        logger.info('[SUMMARY] ' + json.dumps(s))
+        logger.info('')
+
     print((color('red', '**[%2d] %2.4f %2.4f%%\n'))%(e, fs.avg, top1.avg))
     print('')
 

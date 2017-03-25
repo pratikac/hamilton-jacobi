@@ -95,9 +95,7 @@ def create_logger(opt, idx=0):
     l.info('DIFF %s'%r[2])
 
     l.info('')
-    l.info('OPT')
-    s = pprint.pformat(opt)
-    l.info(s)
+    l.info('[OPT] ' + json.dumps(opt))
     l.info('')
 
     return l
