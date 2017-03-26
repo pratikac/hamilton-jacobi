@@ -3,6 +3,7 @@ from copy import deepcopy
 import numpy as np
 import torch as th
 import models
+import pdb
 
 def flatten_params(model, fw, dfw):
     fw.zero_()
@@ -26,7 +27,7 @@ class ESGD(Optimizer):
         defaults = dict(lr=0.1, momentum=0, damp=0,
                  weight_decay=0, nesterov=True,
                  L=0, eps=1e-4, g0=1e-2, g1=0, rho=0,
-                 mult=False, hjb=False, sgld=False, ll=False,
+                 mult=False, hjb=False, sgld=False,
                  verbose=False)
 
         for k in defaults:
@@ -49,11 +50,11 @@ class ESGD(Optimizer):
 
         hjb = c['hjb']
         sgld = c['sgld']
-        ll = c['ll']
 
         lr = c['lr']
         rho = c['rho']
         mult = c['mult']
+        reverse_grad = c['reverse_grad']
         mom = c['momentum']
         wd = c['weight_decay']
         damp = c['damp']
@@ -65,7 +66,7 @@ class ESGD(Optimizer):
         verbose = c['verbose']
 
         llr, beta1 = 0.1, 0.75
-        if hjb or ll:
+        if hjb:
             beta1 = 1e-4
 
         if not 't' in state:
@@ -78,7 +79,7 @@ class ESGD(Optimizer):
 
             state['cache'] = {}
             cache = state['cache']
-            for k in ['w', 'dw', 'mw', 'mdw', 'y', 'z']:
+            for k in ['w', 'dw', 'mw', 'mdw']:
                 state['cache'][k] = tmp.clone().zero_()
 
             state['eta'] = tmp.clone()
@@ -106,12 +107,7 @@ class ESGD(Optimizer):
             if wd > 0:
                 dw.add_(wd, w)
 
-            if ll and i > L/2:
-                # reverse quadratic term in LL loop,
-                # but compute distance from the right place
-                dw.add_(-5*g, w - state['wc'])
-            else:
-                dw.add_(g, w - state['wc'])
+            dw.add_(g, w - state['wc'])
 
             eta.normal_()
             dw.add_(eps/np.sqrt(0.5*llr), eta)
@@ -119,9 +115,8 @@ class ESGD(Optimizer):
             if mult:
                 dw.mul_((maxf-cf))
 
-            # ascent for the later half
-            if ll and i > L/2:
-                dw.mul_(-0.1)
+            if reverse_grad > 0:
+                dw.mul_(-reverse_grad)
 
             if mom > 0:
                 cache['mdw'].mul_(mom).add_(1-damp, dw)
@@ -133,23 +128,13 @@ class ESGD(Optimizer):
             w.add_(-llr, dw)
             mw.mul_(beta1).add_(1-beta1, w)
 
-            if ll:
-                if i <= L/2:
-                    cache['y'].copy_(mw)
-                else:
-                    cache['z'].copy_(mw)
-
         dw = state['dw'].zero_()
-        if ll:
-            dw.add_(state['wc'] - cache['y'])
-            dw.add_(state['wc'] - cache['z'])
+        if L > 0:
+            if rho > 0:
+                dw.add_(rho, state['dwc'])
+            dw.add_(state['wc'] - mw)
         else:
-            if L > 0:
-                if rho > 0:
-                    dw.add_(rho, state['dwc'])
-                dw.add_(state['wc'] - mw)
-            else:
-                dw.add_(state['dwc'])
+            dw.add_(state['dwc'])
 
         if sgld:
             eta.normal_()
@@ -231,6 +216,32 @@ class ESGDAVG(ESGD):
 
         super(ESGDAVG, self).__init__(params, config)
         self.config = config
+
+class LL(HJB):
+    def __init__(self, params, config = {}):
+
+        defaults = dict(lr=0.1, momentum=0.9, damp=0,
+                 weight_decay=0, nesterov=True,
+                 L=100, eps=1e-4, g0=1e-2, g1=0,
+                 verbose=False)
+        for k in defaults:
+            if config.get(k, None) is None:
+                config[k] = defaults[k]
+
+        self.config = config
+        self.config['L'] = config['L']/2
+        super(LL, self).__init__(params, config)
+        self.g0 = config['g0']
+
+    def step(self, closure=None, model=None, criterion=None):
+        self.config['g0'] = self.g0
+        self.config['reverse_grad'] = 0
+        mf1, merr1 = super(LL, self).step(closure, model, criterion)
+
+        self.config['g0'] = -5*self.g0
+        self.config['reverse_grad'] = 1e-6
+        mf2, merr2 = super(LL, self).step(closure, model, criterion)
+        return mf2, merr2
 
 class FB(Optimizer):
     def __init__(self, params, config = {}):
@@ -355,21 +366,6 @@ class FB(Optimizer):
         mf,merr = closure()
 
         return mf,merr
-
-class LL(ESGD):
-    def __init__(self, params, config = {}):
-
-        defaults = dict(lr=0.1, momentum=0.9, damp=0,
-                 weight_decay=0, nesterov=True,
-                 L=100, eps=1e-4, g0=1e-2, g1=0,
-                 verbose=False,
-                 ll=True)
-        for k in defaults:
-            if config.get(k, None) is None:
-                config[k] = defaults[k]
-
-        super(LL, self).__init__(params, config)
-        self.config = config
 
 class PME(Optimizer):
     def __init__(self, params, config = {}):
