@@ -140,14 +140,12 @@ class ESGD(Optimizer):
             eta.normal_()
             dw.add_(eps/np.sqrt(0.5*lr), eta)
 
-        if verbose and state['t'] % 25 == 0:
+        if verbose and state['t'] % 5 == 0:
             debug = dict(dw=dw.norm(), dwc=state['dwc'].norm(),
                 dwdwc=th.dot(dw, state['dwc'])/dw.norm()/state['dwc'].norm(),
                 f=cf, g=g)
-            print {k : round(v, 4) for k,v in debug.items()}
+            print {k : round(v, 5) for k,v in debug.items()}
 
-        if wd > 0:
-            dw.add_(wd, state['wc'])
         if mom > 0:
             state['mdw'].mul_(mom).add_(1-damp, dw)
             if nesterov:
@@ -238,8 +236,8 @@ class LL(HJB):
         self.config['reverse_grad'] = 0
         mf1, merr1 = super(LL, self).step(closure, model, criterion)
 
-        self.config['g0'] = -5*self.g0
-        self.config['reverse_grad'] = 1e-6
+        self.config['g0'] = -1e2*self.g0
+        self.config['reverse_grad'] = 1e-2
         mf2, merr2 = super(LL, self).step(closure, model, criterion)
         return mf2, merr2
 
@@ -300,11 +298,10 @@ class FB(Optimizer):
         wcn, dwcn = state['wc'].norm(), state['dwc'].norm()
 
         g = g0*(1+g1)**state['t']
-        dt = g
+        dt = 0.1
 
-        w = state['cache']['w']
-        cache_w = state['cache']['w'].mul_(0)
-        cache_dw = state['cache']['dw'].mul_(0)
+        w, dw = state['cache']['w'].zero_(), \
+                state['cache']['dw'].zero_()
 
         state['p'].normal_().mul_(1/np.sqrt(N))*dwcn
         p = state['p']
@@ -314,44 +311,48 @@ class FB(Optimizer):
         pn1, pn2 = 0, 0
         for i in xrange(int(L/2)):
             w.copy_(state['wc'])
-            w.add_(dt, p)
+            w.add_(-dt, p)
             unflatten_params(model, w)
 
-            cache_dw.zero_()
+            dw.zero_()
             cf, cerr = closure()
-            flatten_params(model, cache_w, cache_dw)
+            flatten_params(model, w, dw)
             if wd > 0:
-                cache_dw.add_(wd, cache_w)
-            p.add_(llr, cache_dw)
+                dw.add_(wd, w)
+
+            dw.add_(g, w - state['wc'])
+
+            p.add_(llr, dw)
             pn1 = p.norm()
 
-        for i in xrange(int(L/2)):
-            w.copy_(state['wc'])
-            w.add_(-dt/2., p)
-            unflatten_params(model, w)
+        # for i in xrange(int(L/2)):
+        #     w.copy_(state['wc'])
+        #     w.add_(dt/2., p)
+        #     unflatten_params(model, w)
 
-            cache_dw.zero_()
-            cf, cerr = closure()
-            flatten_params(model, cache_w, cache_dw)
-            if wd > 0:
-                cache_dw.add_(wd, cache_w)
-            p.add_(llr, cache_dw)
-            pn2 = p.norm()
+        #     dw.zero_()
+        #     cf, cerr = closure()
+        #     flatten_params(model, w, dw)
+        #     if wd > 0:
+        #         dw.add_(wd, w)
+
+        #     dw.add_(-100*g, w - state['wc'])
+
+        #     p.add_(llr, dw)
+        #     pn2 = p.norm()
 
         dw = state['dw'].zero_()
         dw.add_(p)
 
-        if verbose and state['t'] % 100 == 0:
+        if verbose and state['t'] % 25 == 0:
             debug = dict(dw=dw.norm(), dwc=state['dwc'].norm(),
                 dwdwc=th.dot(dw, state['dwc'])/dw.norm()/state['dwc'].norm(),
                 f=cf, wc=wcn,
                 g=g,
                 dt=dt,
                 pn1=pn1, pn2=pn2)
-            print {k : round(v, 4) for k,v in debug.items()}
+            print {k : round(v, 5) for k,v in debug.items()}
 
-        if wd > 0:
-            dw.add_(wd, state['wc'])
         if mom > 0:
             state['mdw'].mul_(mom).add_(1-damp, dw)
             if nesterov:
