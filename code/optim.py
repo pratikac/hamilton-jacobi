@@ -229,14 +229,16 @@ class LL(HJB):
         self.config = config
         self.config['L'] = config['L']/2
         super(LL, self).__init__(params, config)
-        self.g0 = config['g0']
+        self.g0, self.g1 = config['g0'], config['g1']
 
     def step(self, closure=None, model=None, criterion=None):
         self.config['g0'] = self.g0
+        self.config['g1'] = self.g1
         self.config['reverse_grad'] = 0
         mf1, merr1 = super(LL, self).step(closure, model, criterion)
 
-        self.config['g0'] = -1e2*self.g0
+        self.config['g0'] = -50.
+        self.config['g1'] = 0.
         self.config['reverse_grad'] = 1e-2
         mf2, merr2 = super(LL, self).step(closure, model, criterion)
         return mf2, merr2
