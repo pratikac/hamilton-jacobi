@@ -24,7 +24,7 @@ opt = add_args([
 ['--depth', 16, 'ResNet depth'],
 ['--widen', 2, 'ResNet widen'],
 ['--lr', 0.1, 'learning rate'],
-['--lr_schedule', '', 'learning rate schedule'],
+['--lrs', '', 'learning rate schedule'],
 ['--l2', 0.0, 'ell-2'],
 ['-d', 0.0, 'dropout'],
 ['-L', 0, 'sgld iterations'],
@@ -74,17 +74,17 @@ if ckpt is not None:
     model.load_state_dict(ckpt['state_dict'])
     print('Loading model: %s'%ckpt['name'])
 
-build_filename(opt, blacklist=['lr_schedule','retrain','step', \
+build_filename(opt, blacklist=['lrs','retrain','step', \
                             'ratio','f','v','dataset', 'augment', 'd',
                             'depth', 'widen','save','e','validate','l2','eps'])
 logger = create_logger(opt)
 pprint(opt)
 
 def schedule(e):
-    if opt['lr_schedule'] == '':
-        opt['lr_schedule'] = json.dumps([[opt['B'], opt['lr']]])
+    if opt['lrs'] == '':
+        opt['lrs'] = json.dumps([[opt['B'], opt['lr']]])
 
-    lrs = json.loads(opt['lr_schedule'])
+    lrs = json.loads(opt['lrs'])
 
     idx = len(lrs)-1
     for i in xrange(len(lrs)):
