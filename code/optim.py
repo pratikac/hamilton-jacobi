@@ -249,7 +249,8 @@ class FB(Optimizer):
         defaults = dict(lr=0.1, momentum=0, damp=0,
                  weight_decay=0, nesterov=True,
                  L=100, g0=1e-2, g1=0,
-                 verbose=False)
+                 verbose=False,
+                 backward=False)
 
         for k in defaults:
             if config.get(k, None) is None:
@@ -281,6 +282,7 @@ class FB(Optimizer):
         g1 = c['g1']
         N = state['N']
         verbose = c['verbose']
+        backward = c['backward']
 
         if not 't' in state:
             state['t'] = 0
@@ -307,9 +309,9 @@ class FB(Optimizer):
 
         state['p'].normal_().mul_(1/np.sqrt(N))*dwcn
         p = state['p']
-        # p.copy_(state['dwc'])
-        # if wd > 0:
-        #     p.add_(wd, state['wc'])
+        p.copy_(state['dwc'])
+        if wd > 0:
+            p.add_(wd, state['wc'])
 
         llr = 0.1
         cf = 0
@@ -330,30 +332,33 @@ class FB(Optimizer):
             debug['idw1'] = dw.norm()
 
             p.add_(llr, dw)
+            #p.copy_(dw)
             pn1 = p.norm()
 
-        # for i in xrange(int(1)):
-        #     w.copy_(state['wc'])
-        #     w.add_(dt/100., p)
-        #     unflatten_params(model, w)
+        if backward:
+            for i in xrange(int(1)):
+                w.copy_(state['wc'])
+                w.add_(dt/100., p)
+                unflatten_params(model, w)
 
-        #     dw.zero_()
-        #     cf, cerr = closure()
-        #     flatten_params(model, w, dw)
-        #     if wd > 0:
-        #         dw.add_(wd, w)
+                dw.zero_()
+                cf, cerr = closure()
+                flatten_params(model, w, dw)
+                if wd > 0:
+                    dw.add_(wd, w)
 
-        #     dw.add_(-g, w - state['wc'])
+                # direction does not flip for Burgers?
+                dw.add_(g, w - state['wc'])
 
-        #     debug['idw2'] = dw.norm()
+                debug['idw2'] = dw.norm()
 
-        #     p.add_(llr, dw)
-        #     pn2 = p.norm()
+                p.add_(llr, dw)
+                pn2 = p.norm()
 
         dw = state['dw'].zero_()
         dw.add_(p)
 
-        if verbose and state['t'] % 5 == 0:
+        if verbose and state['t'] % 25 == 0:
             stats = dict(dw=dw.norm(), dwc=state['dwc'].norm(),
                 dwdwc=th.dot(dw, state['dwc'])/dw.norm()/state['dwc'].norm(),
                 f=cf, wc=wcn,
