@@ -300,18 +300,22 @@ class FB(Optimizer):
         wcn, dwcn = state['wc'].norm(), state['dwc'].norm()
 
         g = g0*(1+g1)**state['t']
-        dt = 0.1
+        dt = lr
 
         w, dw = state['cache']['w'].zero_(), \
                 state['cache']['dw'].zero_()
 
         state['p'].normal_().mul_(1/np.sqrt(N))*dwcn
         p = state['p']
+        # p.copy_(state['dwc'])
+        # if wd > 0:
+        #     p.add_(wd, state['wc'])
 
         llr = 0.1
         cf = 0
         pn1, pn2 = 0, 0
-        for i in xrange(int(L/2)):
+        debug = dict()
+        for i in xrange(int(L)):
             w.copy_(state['wc'])
             w.add_(-dt, p)
             unflatten_params(model, w)
@@ -321,15 +325,16 @@ class FB(Optimizer):
             flatten_params(model, w, dw)
             if wd > 0:
                 dw.add_(wd, w)
+            #dw.add_(g, w - state['wc'])
 
-            dw.add_(g, w - state['wc'])
+            debug['idw1'] = dw.norm()
 
             p.add_(llr, dw)
             pn1 = p.norm()
 
-        # for i in xrange(int(L/2)):
+        # for i in xrange(int(1)):
         #     w.copy_(state['wc'])
-        #     w.add_(dt/2., p)
+        #     w.add_(dt/100., p)
         #     unflatten_params(model, w)
 
         #     dw.zero_()
@@ -338,7 +343,9 @@ class FB(Optimizer):
         #     if wd > 0:
         #         dw.add_(wd, w)
 
-        #     dw.add_(-100*g, w - state['wc'])
+        #     dw.add_(-g, w - state['wc'])
+
+        #     debug['idw2'] = dw.norm()
 
         #     p.add_(llr, dw)
         #     pn2 = p.norm()
@@ -346,13 +353,13 @@ class FB(Optimizer):
         dw = state['dw'].zero_()
         dw.add_(p)
 
-        if verbose and state['t'] % 25 == 0:
-            debug = dict(dw=dw.norm(), dwc=state['dwc'].norm(),
+        if verbose and state['t'] % 5 == 0:
+            stats = dict(dw=dw.norm(), dwc=state['dwc'].norm(),
                 dwdwc=th.dot(dw, state['dwc'])/dw.norm()/state['dwc'].norm(),
                 f=cf, wc=wcn,
                 g=g,
-                dt=dt,
                 pn1=pn1, pn2=pn2)
+            debug.update(stats)
             print {k : round(v, 5) for k,v in debug.items()}
 
         if mom > 0:
