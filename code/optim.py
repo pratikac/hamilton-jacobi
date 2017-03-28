@@ -302,18 +302,17 @@ class FB(Optimizer):
         wcn, dwcn = state['wc'].norm(), state['dwc'].norm()
 
         g = g0*(1+g1)**state['t']
-        dt = lr
+        dt = 1./g
 
         w, dw = state['cache']['w'].zero_(), \
                 state['cache']['dw'].zero_()
 
-        state['p'].normal_().mul_(1/np.sqrt(N))*dwcn
         p = state['p']
         p.copy_(state['dwc'])
         if wd > 0:
             p.add_(wd, state['wc'])
 
-        llr = 0.1
+        llr, beta1 = 0.1, 0.75
         cf = 0
         pn1, pn2 = 0, 0
         debug = dict()
@@ -325,14 +324,14 @@ class FB(Optimizer):
             dw.zero_()
             cf, cerr = closure()
             flatten_params(model, w, dw)
+            # the usual weight-decay convexity
+            # should help the fixed-point iteration
             if wd > 0:
                 dw.add_(wd, w)
-            #dw.add_(g, w - state['wc'])
 
             debug['idw1'] = dw.norm()
 
-            p.add_(llr, dw)
-            #p.copy_(dw)
+            p.mul_(beta1).add_(1-beta1, dw)
             pn1 = p.norm()
 
         if backward:
@@ -347,12 +346,9 @@ class FB(Optimizer):
                 if wd > 0:
                     dw.add_(wd, w)
 
-                # direction does not flip for Burgers?
-                dw.add_(g, w - state['wc'])
-
                 debug['idw2'] = dw.norm()
 
-                p.add_(llr, dw)
+                p.mul_(beta1).add_(1-beta1, dw)
                 pn2 = p.norm()
 
         dw = state['dw'].zero_()

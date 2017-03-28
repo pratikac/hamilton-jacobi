@@ -42,7 +42,7 @@ def loadlog(f):
                 logs.append(s)
     return opt, logs, summary
 
-def loaddir(dir, expr='*', old=True):
+def loaddir(dir, expr='*'):
     pkl = dir+'/log.p'
 
     if os.path.isfile(pkl):

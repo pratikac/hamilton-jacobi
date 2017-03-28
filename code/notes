@@ -1,15 +1,9 @@
-lenet:
-    optimal control version
-        g0 = 1e-3, g1 = 1e-4, L=10 works fine
-            0.59 @ 3
-    PME
-        
-
-allcnn:
-    optimal control version
-        g0 = 0.03, g1 = 1e-4, L=20
-        lr_schedule '[[3,1],[6,0.2],[16,0.01]]'
-        12.02 @ 1, 10.46 @ 2, 9.876 @ 3, 9.43 @ 7
-
-averaging local entropy with (M-u)
-        mnist: 0.5 @ 5
+FB:
+    p_0 = random vector
+                   17.36 @ 1, 15.7 @ 2, 14.59 @ 3, 14.08 @ 4,
+        11.55 @ 5, 11.44 @ 6, 11.29 @ 7, 11.28 @ 8, 10.9 @ 9,
+        10.61 @ 10, 
+    p_0 = grad
+                   20.75 @ 1, 18.36 @ 2, 17.5 @ 3, 16.44 @ 4,
+        12.35 @ 5, 11.52 @ 6, 11.76 @ 7, 11.75 @ 8, 12.02 @ 9,
+        9.69 @ 10, 9.56 @ 11, 
