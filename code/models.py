@@ -233,12 +233,13 @@ class RNN(nn.Module):
                 param.get('layers',2)
         self.encoder = nn.Embedding(xdim, hdim)
         self.rnn = getattr(nn, param['m'])(hdim, hdim, nlayers,
-                    bias=False, dropout=param['d'])
+                    dropout=param['d'])
         self.decoder = nn.Linear(hdim, xdim)
+        self.drop = nn.Dropout(param['d'])
 
-        self.init_weights()
         if param['tie']:
             self.decoder.weight = self.encoder.weight
+        self.init_weights()
 
         self.rnn_type = param['m']
         self.hdim = hdim
@@ -251,8 +252,9 @@ class RNN(nn.Module):
         self.decoder.weight.data.uniform_(-dw, dw)
 
     def forward(self, x, h):
-        f = self.encoder(x)
+        f = self.drop(self.encoder(x))
         yh, hh = self.rnn(f, h)
+        yh = self.drop(yh)
         decoded = self.decoder(yh.view(yh.size(0)*yh.size(1), yh.size(2)))
         return decoded.view(yh.size(0), yh.size(1), decoded.size(1)), hh
 
@@ -275,7 +277,7 @@ class ptbs(RNN):
     def __init__(self, opt={}):
         self.name = 'ptbs'
         param = dict(vocab=opt['vocab'], hdim=200, layers=2,
-                d=0, tie=True, m='LSTM')
+                d=0.2, tie=True, m='LSTM')
 
         super(ptbs, self).__init__(param)
 

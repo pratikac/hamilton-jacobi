@@ -59,7 +59,7 @@ if opt['g'] > 1:
 model = model.cuda()
 criterion = nn.CrossEntropyLoss().cuda()
 optimizer = getattr(optim, opt['optim'])(model.parameters(),
-        config = dict(lr=opt['lr'], momentum=0.9, nesterov=True, weight_decay=opt['l2'],
+        config = dict(lr=opt['lr'], momentum=0.0, nesterov=True, weight_decay=opt['l2'],
         L=opt['L'], eps=opt['eps'], g0=opt['g0'], g1=opt['g1'], verbose=opt['v']))
 
 ckpt = None
@@ -140,7 +140,7 @@ def train(e):
             s = dict(i=bi + e*maxb, e=e, f=f)
             logger.info('[LOG] ' + json.dumps(s))
 
-        if bi % 50 == 0 and bi != 0:
+        if bi % 100 == 0 and bi != 0:
             print((color('blue', '[%2d][%4d/%4d] %2.4f'))%(e,bi,maxb,
                 fs.avg))
 
