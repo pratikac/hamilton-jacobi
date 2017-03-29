@@ -10,58 +10,18 @@ sns.set()
 
 colors = sns.color_palette("husl", 8)
 
-whitelist = set(['s','m','lr','eps', 'g0', 'g1', 'L', 'optim'])
+from processlog import *
 
-def get_params_from_filename(s):
-    t = s[s.rfind('/')+6:s.find('_opt_')]
-    _s = s[s.find('_opt_')+5:-4]
-    r = json.loads(_s)
-    r = {k: v for k,v in r.items() if k in whitelist}
-    r['t'] = t
-    return r
+loc = '/Users/pratik/Dropbox/siap17data/allcnn'
+d = loaddir(loc)
 
-def loadlog(f):
-    logs, summary = [], []
-    opt = get_params_from_filename(f)
+d = d[(d['summary'] == True) & (d['val'] == True)]
+d = d.filter(items=['optim', 'top1', 'L', 'e', 's'])
+d.loc[d.L==0,'L'] = 1
+d.loc[:,'e'] += 1
+d['ee'] = d['e']*d['L']
 
-    for l in open(f):
-        if '[LOG]' in l[:5]:
-            logs.append(json.loads(l[5:-1]))
-        elif '[SUMMARY]' in l[:8]:
-            summary.append(json.loads(l[8:-1]))
-        else:
-            try:
-                s = json.loads(l)
-            except:
-                continue
-            if s['i'] == 0:
-                if not 'val' in s:
-                    s['train'] = True
-                summary.append(s)
-            else:
-                logs.append(s)
-    return opt, logs, summary
-
-def loaddir(dir, expr='*'):
-    pkl = dir+'/log.p'
-
-    if os.path.isfile(pkl):
-        return pickle.load(open(pkl, 'r'))
-
-    fs = sorted(glob2.glob(dir + '/**/' + expr + '.log'))
-    d = []
-
-    for i in xrange(len(fs)):
-        print i, get_params_from_filename(fs[i])
-
-    for f in fs:
-        o, l, s = loadlog(f)
-
-        di = pd.DataFrame(l + s)
-        for k in o:
-            di[k] = o[k]
-        d.append(di)
-
-    d = pd.concat(d)
-    pickle.dump(d, open(pkl, 'w'))
-    return d
+plt.figure(1)
+plt.clf()
+sns.tsplot(time='ee',value='top1',data=d,
+            unit='s',condition='optim')
