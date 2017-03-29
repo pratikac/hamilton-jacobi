@@ -19,9 +19,12 @@ parser.add_argument('-m',
 parser.add_argument('-l',
             help='location', type=str,
             default='/Users/pratik/Dropbox/siap17data')
+parser.add_argument('-f',
+            help='reprocess data',
+            action='store_true')
 opt = vars(parser.parse_args())
 
-d = loaddir(os.path.join(opt['l'], opt['m']))
+d = loaddir(os.path.join(opt['l'], opt['m']), force=opt['f'])
 
 d = d[(d['summary'] == True) & (d['val'] == True)]
 d = d.filter(items=['optim', 'top1', 'L', 'e', 's'])

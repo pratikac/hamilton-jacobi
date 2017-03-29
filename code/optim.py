@@ -24,11 +24,12 @@ def unflatten_params(model, fw):
 class ESGD(Optimizer):
     def __init__(self, params, config = {}):
 
-        defaults = dict(lr=0.1, momentum=0, damp=0,
+        defaults = dict(lr=0.1, momentum=0.9, damp=0,
                  weight_decay=0, nesterov=True,
                  L=0, eps=1e-4, g0=1e-2, g1=0, rho=0,
                  mult=False, hjb=False, sgld=False,
-                 verbose=False)
+                 verbose=False,
+                 reverse_grad=0)
 
         for k in defaults:
             if config.get(k, None) is None:
@@ -140,7 +141,7 @@ class ESGD(Optimizer):
             eta.normal_()
             dw.add_(eps/np.sqrt(0.5*lr), eta)
 
-        if verbose and state['t'] % 5 == 0:
+        if verbose and state['t'] % 25 == 0:
             debug = dict(dw=dw.norm(), dwc=state['dwc'].norm(),
                 dwdwc=th.dot(dw, state['dwc'])/dw.norm()/state['dwc'].norm(),
                 f=cf, g=g)
@@ -227,19 +228,22 @@ class LL(HJB):
                 config[k] = defaults[k]
 
         self.config = config
-        self.config['L'] = config['L']/2
+
         super(LL, self).__init__(params, config)
         self.g0, self.g1 = config['g0'], config['g1']
+        self.L1, self.L2 = int(config['L']*0.9), int(config['L']*0.1)
 
     def step(self, closure=None, model=None, criterion=None):
         self.config['g0'] = self.g0
         self.config['g1'] = self.g1
         self.config['reverse_grad'] = 0
+        self.config['L'] = self.L1
         mf1, merr1 = super(LL, self).step(closure, model, criterion)
 
         self.config['g0'] = -50.
         self.config['g1'] = 0.
         self.config['reverse_grad'] = 1e-2
+        self.config['L'] = self.L2
         mf2, merr2 = super(LL, self).step(closure, model, criterion)
         return mf2, merr2
 
