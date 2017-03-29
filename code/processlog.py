@@ -56,7 +56,7 @@ def loaddir(dir, expr='*', force=False):
     if (not force) and os.path.isfile(pkl):
         return pickle.load(open(pkl, 'r'))
 
-    fs = sorted(glob2.glob(dir + '/**/' + expr + '.log'))
+    fs = sorted(glob2.glob(dir + '/*/' + expr + '.log'))
     d = []
 
     for f in fs:

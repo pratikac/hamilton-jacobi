@@ -4,7 +4,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-import os, sys, glob2, pdb, re, json
+import os, sys, glob2, pdb, re, json, argparse
 import cPickle as pickle
 sns.set()
 
@@ -12,8 +12,16 @@ colors = sns.color_palette("husl", 8)
 
 from processlog import *
 
-loc = '/Users/pratik/Dropbox/siap17data/allcnn'
-d = loaddir(loc)
+parser = argparse.ArgumentParser(description='Plotter')
+parser.add_argument('-m',
+            help='mnistfc | lenet | allcnn', type=str,
+            default='mnistfc')
+parser.add_argument('-l',
+            help='location', type=str,
+            default='/Users/pratik/Dropbox/siap17data')
+opt = vars(parser.parse_args())
+
+d = loaddir(os.path.join(opt['l'], opt['m']))
 
 d = d[(d['summary'] == True) & (d['val'] == True)]
 d = d.filter(items=['optim', 'top1', 'L', 'e', 's'])
@@ -25,3 +33,4 @@ plt.figure(1)
 plt.clf()
 sns.tsplot(time='ee',value='top1',data=d,
             unit='s',condition='optim')
+plt.title(opt['m'])
