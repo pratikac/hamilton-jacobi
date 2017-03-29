@@ -1,5 +1,6 @@
 import torch as th
 import torch.nn as nn
+from torch.autograd import Variable
 import math, logging, pdb
 
 class View(nn.Module):
@@ -223,3 +224,65 @@ class wideresnet(nn.Module):
 
     def forward(self, x):
         return self.m(x)
+
+class RNN(nn.Module):
+    """Container module with an encoder, a recurrent module, and a decoder."""
+    def __init__(self, param):
+        super(RNN, self).__init__()
+        xdim, hdim, nlayers = param['vocab'], param['hdim'], \
+                param.get('layers',2)
+        self.encoder = nn.Embedding(xdim, hdim)
+        self.rnn = getattr(nn, param['m'])(hdim, hdim, nlayers,
+                    bias=False, dropout=param['d'])
+        self.decoder = nn.Linear(hdim, xdim)
+
+        self.init_weights()
+        if param['tie']:
+            self.decoder.weight = self.encoder.weight
+
+        self.rnn_type = param['m']
+        self.hdim = hdim
+        self.nlayers = nlayers
+
+    def init_weights(self):
+        dw = 0.1
+        self.encoder.weight.data.uniform_(-dw, dw)
+        self.decoder.bias.data.fill_(0)
+        self.decoder.weight.data.uniform_(-dw, dw)
+
+    def forward(self, x, h):
+        f = self.encoder(x)
+        yh, hh = self.rnn(f, h)
+        decoded = self.decoder(yh.view(yh.size(0)*yh.size(1), yh.size(2)))
+        return decoded.view(yh.size(0), yh.size(1), decoded.size(1)), hh
+
+    def init_hidden(self, bsz):
+        w = next(self.parameters()).data
+        if self.rnn_type == 'LSTM':
+            return (Variable(w.new(self.nlayers, bsz, self.hdim).zero_()),
+                    Variable(w.new(self.nlayers, bsz, self.hdim).zero_()))
+        else:
+            return Variable(w.new(self.nlayers, bsz, self.hdim).zero_())
+
+def repackage_hidden(h):
+    """Wraps hidden states in new Variables, to detach them from their history."""
+    if type(h) == Variable:
+        return Variable(h.data)
+    else:
+        return tuple(repackage_hidden(v) for v in h)
+
+class ptbs(RNN):
+    def __init__(self, opt={}):
+        self.name = 'ptbs'
+        param = dict(vocab=opt['vocab'], hdim=200, layers=2,
+                d=0, tie=True, m='LSTM')
+
+        super(ptbs, self).__init__(param)
+
+class ptbl(RNN):
+    def __init__(self, opt={}):
+        self.name = 'ptbl'
+        param = dict(vocab=opt['vocab'], hdim=1500, layers=2,
+                d=0.65, tie=True, m='LSTM')
+
+        super(ptbl, self).__init__(param)
