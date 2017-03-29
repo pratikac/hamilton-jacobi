@@ -58,9 +58,10 @@ if opt['g'] > 1:
     model = th.nn.DataParallel(model)
 model = model.cuda()
 criterion = nn.CrossEntropyLoss().cuda()
-optimizer = getattr(optim, opt['optim'])(model.parameters(),
-        config = dict(lr=opt['lr'], momentum=0.0, nesterov=True, weight_decay=opt['l2'],
-        L=opt['L'], eps=opt['eps'], g0=opt['g0'], g1=opt['g1'], verbose=opt['v']))
+# optimizer = getattr(optim, opt['optim'])(model.parameters(),
+#         config = dict(lr=opt['lr'], momentum=0.0, nesterov=True, weight_decay=opt['l2'],
+#         L=opt['L'], eps=opt['eps'], g0=opt['g0'], g1=opt['g1'], verbose=opt['v']))
+optimizer = th.optim.SGD(model.parameters(), lr=opt['lr'])
 
 ckpt = None
 if not opt['retrain'] == '':
@@ -97,7 +98,7 @@ def schedule(e):
     optimizer.config['lr'] = lr
 
 def train(e):
-    schedule(e)
+    #schedule(e)
 
     model.train()
 
@@ -105,7 +106,7 @@ def train(e):
     ts = timer()
 
     bsz = opt['b']
-    maxb = (len(ptb['train']) -1) // opt['T']
+    maxb = (ptb['train'].size(0) -1) // opt['T']
 
     for bi in xrange(maxb):
         def helper():
@@ -119,7 +120,7 @@ def train(e):
                 h = model.init_hidden(opt['b'])
                 h = models.repackage_hidden(h)
 
-                optimizer.zero_grad()
+                model.zero_grad()
                 yh, hh = model(x, h)
                 f = criterion(yh.view(-1, opt['vocab']), y)
                 if bprop:
@@ -131,7 +132,8 @@ def train(e):
                 return (f, None)
             return feval
 
-        f, err = optimizer.step(helper(), model, criterion)
+        #f, err = optimizer.step(helper(), model, criterion)
+        f, err = optimizer.step(helper())
         th.cuda.synchronize()
 
         fs.update(f, bsz)

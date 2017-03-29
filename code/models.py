@@ -276,8 +276,8 @@ def repackage_hidden(h):
 class ptbs(RNN):
     def __init__(self, opt={}):
         self.name = 'ptbs'
-        param = dict(vocab=opt['vocab'], hdim=200, layers=2,
-                d=0.2, tie=True, m='LSTM')
+        param = dict(vocab=opt['vocab'], hdim=650, layers=2,
+                d=0.5, tie=True, m='LSTM')
 
         super(ptbs, self).__init__(param)
 
