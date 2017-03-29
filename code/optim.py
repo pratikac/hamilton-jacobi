@@ -242,7 +242,7 @@ class LL(HJB):
 
         self.config['g0'] = -50.
         self.config['g1'] = 0.
-        self.config['reverse_grad'] = 1e-2
+        self.config['reverse_grad'] = 1e-1
         self.config['L'] = self.L2
         mf2, merr2 = super(LL, self).step(closure, model, criterion)
         return mf2, merr2
