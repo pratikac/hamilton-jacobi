@@ -58,10 +58,9 @@ if opt['g'] > 1:
     model = th.nn.DataParallel(model)
 model = model.cuda()
 criterion = nn.CrossEntropyLoss().cuda()
-# optimizer = getattr(optim, opt['optim'])(model.parameters(),
-#         config = dict(lr=opt['lr'], momentum=0.0, nesterov=True, weight_decay=opt['l2'],
-#         L=opt['L'], eps=opt['eps'], g0=opt['g0'], g1=opt['g1'], verbose=opt['v']))
-optimizer = th.optim.SGD(model.parameters(), lr=opt['lr'])
+optimizer = getattr(optim, opt['optim'])(model.parameters(),
+        config = dict(lr=opt['lr'], momentum=0.0, nesterov=True, weight_decay=opt['l2'],
+        L=opt['L'], eps=opt['eps'], g0=opt['g0'], g1=opt['g1'], verbose=opt['v']))
 
 ckpt = None
 if not opt['retrain'] == '':
@@ -102,7 +101,7 @@ def train(e):
 
     model.train()
 
-    fs = AverageMeter()
+    fs,perp = AverageMeter(), AverageMeter()
     ts = timer()
 
     bsz = opt['b']
@@ -128,37 +127,37 @@ def train(e):
 
                 nn.utils.clip_grad_norm(model.parameters(), opt['clip'])
 
-                f = f.data[0]*opt['T']
-                return (f, None)
+                f = f.data[0]
+                return (f, math.exp(f))
             return feval
 
-        #f, err = optimizer.step(helper(), model, criterion)
-        f, err = optimizer.step(helper())
+        f, p = optimizer.step(helper(), model, criterion)
         th.cuda.synchronize()
 
         fs.update(f, bsz)
+        perp.update(p, bsz)
 
         if opt['l']:
-            s = dict(i=bi + e*maxb, e=e, f=f)
+            s = dict(i=bi + e*maxb, e=e, f=f, perp=p)
             logger.info('[LOG] ' + json.dumps(s))
 
         if bi % 100 == 0 and bi != 0:
-            print((color('blue', '[%2d][%4d/%4d] %2.4f'))%(e,bi,maxb,
-                fs.avg))
+            print((color('blue', '[%2d][%4d/%4d] %2.4f %2.4f'))%(e,bi,maxb,
+                fs.avg, perp.avg))
 
     if opt['l']:
-        s = dict(e=e, i=0, f=fs.avg, train=True)
+        s = dict(e=e, i=0, f=fs.avg, perp=perp.avg, train=True)
         logger.info('[SUMMARY] ' + json.dumps(s))
         logger.info('')
 
-    print(  (color('blue', '++[%2d] %2.4f [%.2fs]'))% (e,
-            fs.avg, timer()-ts))
+    print(  (color('blue', '++[%2d] %2.4f %2.4f [%.2fs]'))% (e,
+            fs.avg, perp.avg, timer()-ts))
 
 def val(e, src):
     model.eval()
 
     h = model.init_hidden(opt['b'])
-    fs = AverageMeter()
+    fs,perp = AverageMeter(), AverageMeter()
 
     for bi in xrange(0, ptb[src].size(0)-1, opt['T']):
         h = models.repackage_hidden(h)
@@ -170,15 +169,17 @@ def val(e, src):
                 Variable(y.squeeze().cuda(), volatile=True)
         yh, hh = model(x, h)
 
-        f = criterion(yh.view(-1, opt['vocab']), y).data[0]*opt['T']
+        f = criterion(yh.view(-1, opt['vocab']), y).data[0]
+
         fs.update(f, bsz)
+        perp.update(math.exp(f), bsz)
 
     if opt['l']:
-        s = dict(e=e, i=0, f=fs.avg, val=True)
+        s = dict(e=e, i=0, f=fs.avg, perp=perp.avg, val=True)
         logger.info('[SUMMARY] ' + json.dumps(s))
         logger.info('')
 
-    print((color('red', '**[%2d] %2.4f\n'))%(e, fs.avg))
+    print((color('red', '**[%2d] %2.4f %2.4f\n'))%(e, fs.avg, perp.avg))
     print('')
 
 for e in xrange(opt['e'], opt['B']):

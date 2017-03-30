@@ -32,7 +32,7 @@ opt = add_args([
 ['--g0', 1e-4, 'gamma'],
 ['--g1', 0.0, 'scoping'],
 ['-s', 42, 'seed'],
-['-g', 0, 'gpu idx'],
+['-g', 2, 'gpu idx'],
 ['-l', False, 'log'],
 ['-f', 10, 'print freq'],
 ['-v', False, 'verbose'],
