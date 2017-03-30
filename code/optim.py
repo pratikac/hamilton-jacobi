@@ -29,7 +29,8 @@ class ESGD(Optimizer):
                  L=0, eps=1e-4, g0=1e-2, g1=0, rho=0,
                  mult=False, hjb=False, sgld=False,
                  verbose=False,
-                 reverse_grad=0)
+                 reverse_grad=0,
+                 llr=0.1, beta1=0.75)
 
         for k in defaults:
             if config.get(k, None) is None:
@@ -65,10 +66,8 @@ class ESGD(Optimizer):
         g0 = c['g0']
         g1 = c['g1']
         verbose = c['verbose']
-
-        llr, beta1 = 0.1, 0.75
-        if hjb:
-            beta1 = 1e-4
+        llr = c['llr']
+        beta1 = c['beta1']
 
         if not 't' in state:
             state['t'] = 0
@@ -197,6 +196,9 @@ class HJB(ESGD):
             if config.get(k, None) is None:
                 config[k] = defaults[k]
 
+        config['eps'] = 1e-8
+        config['llr'] = 0.25
+        config['beta1'] = 1e-4
         super(HJB, self).__init__(params, config)
         self.config = config
 

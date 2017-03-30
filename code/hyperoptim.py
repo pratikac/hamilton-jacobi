@@ -33,7 +33,7 @@ cmd = opt['command']
 params = json.loads(opt['params'])
 
 cmds = []
-gs = [0,1]
+gs = [0,1,2]
 keys,values = zip(*params.items())
 for v in product(*values):
     p = dict(zip(keys,v))
