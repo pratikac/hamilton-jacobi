@@ -15,6 +15,8 @@ from pprint import pprint
 opt = add_args([
 ['-o', '/local2/pratikac/results', 'output'],
 ['-m', 'ptbs', 'ptbs | ptbl'],
+['--hdim', 200, 'hdim'],
+['-d', 0.2, 'dropout'],
 ['--optim', 'ESGD', 'ESGD | HJB | PME | FB | LL | PMEAVG | SGLD | SGD'],
 ['-b', 20, 'batch_size'],
 ['-e', 0, 'start epoch'],
@@ -29,7 +31,7 @@ opt = add_args([
 ['--g0', 1e-4, 'gamma'],
 ['--g1', 0.0, 'scoping'],
 ['-s', 42, 'seed'],
-['-g', 0, 'gpu idx'],
+['-g', 2, 'gpu idx'],
 ['-l', False, 'log'],
 ['-f', 10, 'print freq'],
 ['-v', False, 'verbose'],
@@ -43,7 +45,7 @@ if opt['l']:
     opt['f'] = 1
 
 th.set_num_threads(2)
-if opt['g'] in [0, 1]:
+if opt['g'] in [0, 1, 2]:
     th.cuda.set_device(opt['g'])
 random.seed(opt['s'])
 np.random.seed(opt['s'])
@@ -54,7 +56,7 @@ cudnn.benchmark = True
 corpus, ptb, loader = loader.ptb(opt)
 opt['vocab'] = len(corpus.dictionary)
 model = getattr(models, opt['m'])(opt)
-if opt['g'] > 1:
+if opt['g'] > 2:
     model = th.nn.DataParallel(model)
 model = model.cuda()
 criterion = nn.CrossEntropyLoss().cuda()
@@ -107,6 +109,7 @@ def train(e):
     bsz = opt['b']
     maxb = (ptb['train'].size(0) -1) // opt['T']
 
+    h = model.init_hidden(opt['b'])
     for bi in xrange(maxb):
         def helper():
             def feval(bprop=True):
@@ -116,11 +119,10 @@ def train(e):
                 x, y = Variable(x.cuda()), Variable(y.squeeze().cuda())
                 bsz = x.size(0)
 
-                h = model.init_hidden(opt['b'])
-                h = models.repackage_hidden(h)
+                _h = models.repackage_hidden(h)
 
                 model.zero_grad()
-                yh, hh = model(x, h)
+                yh, hh = model(x, _h)
                 f = criterion(yh.view(-1, opt['vocab']), y)
                 if bprop:
                     f.backward()

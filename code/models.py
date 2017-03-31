@@ -276,15 +276,20 @@ def repackage_hidden(h):
 class ptbs(RNN):
     def __init__(self, opt={}):
         self.name = 'ptbs'
-        param = dict(vocab=opt['vocab'], hdim=650, layers=2,
-                d=0.5, tie=True, m='LSTM')
+        hdim = opt.get('hdim', 200)
+        d = opt.get('d', 0.2)
+        param = dict(vocab=opt['vocab'], hdim=hdim, layers=2,
+                d=d, tie=True, m='LSTM')
 
         super(ptbs, self).__init__(param)
 
 class ptbl(RNN):
     def __init__(self, opt={}):
         self.name = 'ptbl'
-        param = dict(vocab=opt['vocab'], hdim=1500, layers=2,
-                d=0.65, tie=True, m='LSTM')
+        hdim = opt.get('hdim', 1500)
+        d = opt.get('d', 0.65)
+
+        param = dict(vocab=opt['vocab'], hdim=hdim, layers=2,
+                d=d, tie=True, m='LSTM')
 
         super(ptbl, self).__init__(param)
