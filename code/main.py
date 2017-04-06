@@ -15,7 +15,7 @@ from pprint import pprint
 opt = add_args([
 ['-o', '/local2/pratikac/results', 'output'],
 ['-m', 'lenet', 'lenet | mnistfc | allcnn | wideresnet'],
-['--optim', 'ESGD', 'ESGD | HJB | PME | FB | LL | PMEAVG | SGLD | SGD'],
+['--optim', 'ESGD', 'ESGD | HJB | PME | FP | LL | PMEAVG | SGLD | SGD'],
 ['--dataset', 'mnist', 'mnist | rotmnist | cifar10 | cifar100'],
 ['-b', 128, 'batch_size'],
 ['--augment', False, 'data augmentation'],

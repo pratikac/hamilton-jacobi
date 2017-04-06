@@ -249,7 +249,7 @@ class LL(HJB):
         mf2, merr2 = super(LL, self).step(closure, model, criterion)
         return mf2, merr2
 
-class FB(Optimizer):
+class FP(Optimizer):
     def __init__(self, params, config = {}):
 
         defaults = dict(lr=0.1, momentum=0, damp=0,
@@ -262,7 +262,7 @@ class FB(Optimizer):
             if config.get(k, None) is None:
                 config[k] = defaults[k]
 
-        super(FB, self).__init__(params, config)
+        super(FP, self).__init__(params, config)
         self.config = config
 
     def step(self, closure=None, model=None, criterion=None):

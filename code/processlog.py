@@ -13,7 +13,7 @@ colors = sns.color_palette("husl", 8)
 whitelist = set(['s','m','lr','eps', 'g0', 'g1', 'L', 'optim'])
 
 def get_params_from_filename(s):
-    t = s[s.rfind('/')+6:s.find('_opt_')]
+    t = s[s.find('('):s.find('_opt_')]
     _s = s[s.find('_opt_')+5:-4]
     r = json.loads(_s)
     r = {k: v for k,v in r.items() if k in whitelist}
