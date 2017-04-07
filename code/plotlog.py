@@ -82,29 +82,26 @@ def rough(dc=dc, train=False):
     plt.grid('on')
 
 
-if opt['r']:
-    rough()
-    sys.exit(0)
-
-
 def mnistfc():
     fig = plt.figure(1, figsize=(8,7))
     plt.clf()
     ax = fig.add_subplot(111)
 
-    rough(dc[(dc['ee']<100)])
+    rough(dc[(dc['ee']<=200)])
     plt.legend(loc='best')
     plt.xlabel(r'Epochs $\times$ L')
     plt.ylabel(r'\% Error')
-    plt.ylim([1,3])
-    plt.xlim([0, 80])
-    xt = [0,20,40,60,80]
+    plt.ylim([1.0, 1.5])
+    plt.xlim([20, 200])
+    xt = [20, 50, 100, 150, 200]
     plt.xticks(xt, [str(s) for s in xt])
-    yt = [1.0, 1.5, 2.0, 2.5, 3.0]
+    yt = [1.0, 1.1, 1.2, 1.3, 1.4, 1.5]
     plt.yticks(yt, [str(s) for s in yt])
-    plt.title(r'mnistfc: Validation error')
-    plt.plot(range(80), 1.185*np.ones(80), 'k--', lw=1)
-    ax.text(10, 1.25, r'$1.185$\%', fontsize=fsz,
+    # plt.title(r'mnistfc: Validation error')
+    plt.title('')
+
+    plt.plot(range(200), 1.08*np.ones(200), 'k--', lw=1)
+    ax.text(50, 1.09, r'$1.08$\%', fontsize=fsz,
             verticalalignment='center', color='k')
     if opt['s']:
         plt.savefig('../fig/mnistfc_valid.pdf', bbox_inches='tight')
@@ -118,16 +115,17 @@ def lenet():
     plt.legend(loc='best')
     plt.xlabel(r'Epochs $\times$ L')
     plt.ylabel(r'\% Error')
-    plt.ylim([0.45, 0.75])
-    plt.xlim([20, 80])
-    xt = [20,40,60,80]
+    plt.ylim([0.5, 1.0])
+    plt.xlim([0, 80])
+    xt = [0, 20,40,60,80]
     plt.xticks(xt, [str(s) for s in xt])
-    yt = [0.45, 0.55, 0.65, 0.75]
+    yt = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
     plt.yticks(yt, [str(s) for s in yt])
-    plt.title(r'LeNet: Validation error')
-    plt.plot(range(80), 0.5*np.ones(80), 'k--', lw=1)
-    ax.text(25, 0.49, r'$0.5$\%', fontsize=fsz,
-            verticalalignment='center', color='k')
+    # plt.title(r'LeNet: Validation error')
+    plt.title('')
+    # plt.plot(range(80), 0.5*np.ones(80), 'k--', lw=1)
+    # ax.text(25, 0.49, r'$0.5$\%', fontsize=fsz,
+    #         verticalalignment='center', color='k')
 
     if opt['s']:
         plt.savefig('../fig/lenet_valid.pdf', bbox_inches='tight')
@@ -148,7 +146,8 @@ def allcnn():
     plt.xticks(xt, [str(s) for s in xt])
     yt = [5,10,15,20]
     plt.yticks(yt, [str(s) for s in yt])
-    plt.title(r'All-CNN: Validation error')
+    # plt.title(r'All-CNN: Validation error')
+    plt.title('')
 
     plt.plot(range(200), 7.9*np.ones(200), 'k--', lw=1)
     ax.text(20, 8.25, r'$7.9$\%', fontsize=fsz,
@@ -186,12 +185,20 @@ def allcnn():
     plt.xticks(xt, [str(s) for s in xt])
     yt = [0, 0.2, 0.4, 0.6]
     plt.yticks(yt, [str(s) for s in yt])
-    plt.title(r'All-CNN: Training loss')
+    plt.title('')
+    # plt.title(r'All-CNN: Training loss')
 
     plt.plot(range(200), 0.046*np.ones(200), 'k--', lw=1)
 
-    ax.text(20, 0.06, r'$0.046$\%', fontsize=fsz,
+    ax.text(20, 0.06, r'$0.046$', fontsize=fsz,
             verticalalignment='center', color='k')
 
     if opt['s']:
         plt.savefig('../fig/allcnn_loss.pdf', bbox_inches='tight')
+
+if opt['r']:
+    rough()
+    sys.exit(0)
+else:
+    globals()[opt['m']]()
+    sys.exit(0)
