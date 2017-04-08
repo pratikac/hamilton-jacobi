@@ -149,8 +149,8 @@ def allcnn():
     # plt.title(r'All-CNN: Validation error')
     plt.title('')
 
-    plt.plot(range(200), 7.9*np.ones(200), 'k--', lw=1)
-    ax.text(20, 8.25, r'$7.9$\%', fontsize=fsz,
+    plt.plot(range(200), 7.82*np.ones(200), 'k--', lw=1)
+    ax.text(20, 8.25, r'$7.82$\%', fontsize=fsz,
             verticalalignment='center', color='k')
 
     if opt['s']:
