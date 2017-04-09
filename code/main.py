@@ -11,11 +11,12 @@ import models, loader, optim
 import numpy as np
 import logging
 from pprint import pprint
+import pdb
 
 opt = add_args([
 ['-o', '/local2/pratikac/results', 'output'],
 ['-m', 'lenet', 'lenet | mnistfc | allcnn | wideresnet'],
-['--optim', 'ESGD', 'ESGD | HJB | PME | FP | LL | PMEAVG | SGLD | SGD'],
+['--optim', 'ESGD', 'ESGD | HJB | PME | FP | LL | PMEAVG | SGLD | SGD | HEAT'],
 ['--dataset', 'mnist', 'mnist | rotmnist | cifar10 | cifar100'],
 ['-b', 128, 'batch_size'],
 ['--augment', False, 'data augmentation'],

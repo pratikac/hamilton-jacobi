@@ -218,6 +218,22 @@ class ESGDAVG(ESGD):
         super(ESGDAVG, self).__init__(params, config)
         self.config = config
 
+class HEAT(ESGD):
+    def __init__(self, params, config = {}):
+
+        defaults = dict(lr=0.1, momentum=0.9, damp=0,
+                 weight_decay=0, nesterov=True,
+                 L=100, g0=10, g1=0,
+                 verbose=False,
+                 mult=False)
+
+        for k in defaults:
+            if config.get(k, None) is None:
+                config[k] = defaults[k]
+
+        super(HEAT, self).__init__(params, config)
+        self.config = config
+
 class LL(HJB):
     def __init__(self, params, config = {}):
 
