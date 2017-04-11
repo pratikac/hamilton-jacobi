@@ -53,7 +53,7 @@ dc['ee'] = dc['e']*dc['L']
 dc = dc.filter(items=['optim', 'f', 'ee', 'top1', 's','train','val'])
 dc = dc[ (dc['optim'] != 'LL')]
 
-colors = dict(SGD='k',ESGD='r',HJB='b',FP='g',PME='m',LL='y')
+colors = dict(SGD='k',ESGD='r',HJB='b',FP='g',PME='m',HEAT='y',LL='p')
 
 def rough(dc=dc, train=False):
     d = dc.copy()

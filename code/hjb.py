@@ -49,7 +49,7 @@ if opt['s']:
     plt.rc('axes', labelsize=fsz)
     plt.rc('xtick', labelsize=fsz)
     plt.rc('ytick', labelsize=fsz)
-    plt.rc('legend', fontsize=fsz*0.5)
+    plt.rc('legend', fontsize=fsz*0.8)
     plt.rc('figure', titlesize=fsz)
 
 N, M = 500, 3
@@ -152,15 +152,15 @@ plt.fill_between(x, f, f+r0, color='grey', alpha='0.35')
 plt.fill_between(x, f, f+rsgds[-1]/4., color='grey', alpha='0.9')
 
 plt.plot(x, vs[-1],'indianred',lw=1.5, label=r'$u_{\textrm{viscous\ HJ}}(x,T)$')
-plt.fill_between(x, vs[-1], vs[-1]+rvs[-1], color='indianred', alpha='0.75')
+plt.fill_between(x, f, f+rvs[-1], color='indianred', alpha='0.75')
 
 plt.plot(x, nvs[-1],'royalblue',lw=1.5, label=r'$u_{\textrm{non-viscous\ HJ}}(x,T)$')
-plt.fill_between(x, nvs[-1], nvs[-1]+rnvs[-1]/3.,
+plt.fill_between(x, f, f+rnvs[-1]/2.,
         color='royalblue', alpha='0.75')
 
 plt.xticks([])
 plt.yticks([])
-plt.title(r'Viscous vs. non-viscous Hamilton-Jacobi equation smoothing')
+#plt.title(r'Viscous vs. non-viscous Hamilton-Jacobi equation smoothing')
 plt.legend(loc='upper center')
 if opt['s']:
     plt.savefig('../fig/smoothing.pdf', bbox_inches='tight')
