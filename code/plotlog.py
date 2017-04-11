@@ -51,7 +51,7 @@ dc.loc[dc.L==0,'L'] = 1
 dc.loc[:,'e'] += 1
 dc['ee'] = dc['e']*dc['L']
 dc = dc.filter(items=['optim', 'f', 'ee', 'top1', 's','train','val'])
-dc = dc[ (dc['optim'] != 'LL') & (dc['optim'] != 'PME')]
+dc = dc[ (dc['optim'] != 'LL')]
 
 colors = dict(SGD='k',ESGD='r',HJB='b',FP='g',PME='m',LL='y')
 

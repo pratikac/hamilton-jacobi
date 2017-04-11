@@ -469,8 +469,8 @@ class PME(Optimizer):
 
         g = g0*(1+g1)**state['t']
         h = np.sqrt(g)*dwcn
-        #dt = 1
-        #beta = L*dt/h**2      # this is the discretization
+        # dt = 1
+        # beta = L*dt/h**2      # this is the discretization
         beta = 0.5
 
         w = state['cache']['w']
