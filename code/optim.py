@@ -27,7 +27,7 @@ class ESGD(Optimizer):
         defaults = dict(lr=0.1, momentum=0.9, damp=0,
                  weight_decay=0, nesterov=True,
                  L=0, eps=1e-4, g0=1e-2, g1=0, rho=0,
-                 mult=False, hjb=False, sgld=False,
+                 mult=False, hjb=False, sgld=False, heat=False,
                  verbose=False,
                  reverse_grad=0,
                  llr=0.1, beta1=0.75)
@@ -52,6 +52,7 @@ class ESGD(Optimizer):
 
         hjb = c['hjb']
         sgld = c['sgld']
+        heat = c['heat']
 
         lr = c['lr']
         rho = c['rho']
@@ -126,7 +127,13 @@ class ESGD(Optimizer):
                     dw = cache['mdw']
 
             w.add_(-llr, dw)
-            mw.mul_(beta1).add_(1-beta1, w)
+            if not heat:
+                mw.mul_(beta1).add_(1-beta1, w)
+            else:
+                mw.add_(w)
+
+        if L > 0 and heat:
+            mw.mul_(1/float(L+1))
 
         dw = state['dw'].zero_()
         if L > 0:
@@ -225,7 +232,7 @@ class HEAT(ESGD):
                  weight_decay=0, nesterov=True,
                  L=100, g0=10, g1=0,
                  verbose=False,
-                 mult=False)
+                 mult=False, heat=True)
 
         for k in defaults:
             if config.get(k, None) is None:
