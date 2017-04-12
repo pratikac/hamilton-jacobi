@@ -56,7 +56,7 @@ dc = dc.filter(items=['optim', 'f', 'ee', 'top1', 's','train','val'])
 # remove the diverging last few epochs for PME
 dc = dc.drop(dc[(dc.optim == 'PME') & (dc.ee > 150)].index)
 
-dc = dc[(dc.optim != 'HEAT') & (dc.optim != 'LL')]
+#dc = dc[(dc.optim != 'HEAT') & (dc.optim != 'LL')]
 
 colors = dict(SGD='k',ESGD='r',HJB='b',FP='g',PME='m',HEAT='y',LL='c')
 
