@@ -50,14 +50,21 @@ dc = dc.filter(items=['optim', 'f', 'L', 'e', 'top1', 's','train','val'])
 dc.loc[dc.L==0,'L'] = 1
 dc.loc[:,'e'] += 1
 dc['ee'] = dc['e']*dc['L']
+
 dc = dc.filter(items=['optim', 'f', 'ee', 'top1', 's','train','val'])
-dc = dc[ (dc['optim'] != 'LL')]
 
-colors = dict(SGD='k',ESGD='r',HJB='b',FP='g',PME='m',HEAT='y',LL='p')
+# remove the diverging last few epochs for PME
+dc = dc.drop(dc[(dc.optim == 'PME') & (dc.ee > 150)].index)
 
-def rough(dc=dc, train=False):
+dc = dc[(dc.optim != 'HEAT') & (dc.optim != 'LL')]
+
+colors = dict(SGD='k',ESGD='r',HJB='b',FP='g',PME='m',HEAT='y',LL='c')
+
+def rough(dc, train=False):
     d = dc.copy()
     d = d[(d['val'] == True)]
+    plt.figure(1)
+    plt.clf()
     sns.tsplot(time='ee',value='top1',data=d,
                 unit='s',condition='optim', color=colors)
     sns.tsplot(time='ee',value='top1',
@@ -65,8 +72,12 @@ def rough(dc=dc, train=False):
                 marker='o', interpolate=False,
                 unit='s',condition='optim', color=colors,
                 legend=False)
+    plt.title(opt['m'])
+    plt.grid('on')
 
     if train:
+        plt.figure(2)
+        plt.clf()
         d = dc.copy()
         d = d[(d['train'] == True)]
         d = d.drop_duplicates(['s', 'ee'])
@@ -78,9 +89,8 @@ def rough(dc=dc, train=False):
                     marker='o',
                     unit='s',condition='optim', color=colors,
                     legend=False, linestyle='--')
-    plt.title(opt['m'])
-    plt.grid('on')
-
+        plt.title(opt['m'])
+        plt.grid('on')
 
 def mnistfc():
     fig = plt.figure(1, figsize=(8,7))
@@ -134,7 +144,7 @@ def lenet():
 def allcnn():
     fig = plt.figure(1, figsize=(8,7))
     plt.clf()
-    ax = fig.add_subplot(111)
+    fig.add_subplot(111)
 
     rough(dc[(dc['ee']<200)])
     plt.legend(loc='best')
@@ -150,7 +160,7 @@ def allcnn():
     plt.title('')
 
     plt.plot(range(200), 7.82*np.ones(200), 'k--', lw=1)
-    ax.text(20, 8.25, r'$7.82$\%', fontsize=fsz,
+    plt.text(20, 8.25, r'$7.82$\%', fontsize=fsz,
             verticalalignment='center', color='k')
 
     if opt['s']:
@@ -161,9 +171,10 @@ def allcnn():
     ax = fig.add_subplot(111)
 
     for o in sorted(colors.keys()):
-        if o in ['LL', 'PME']:
-            continue
         d = dc.copy()
+        if o == 'HEAT' or o == 'LL':
+            continue
+
         d2 = d[(d['train'] == True) & (d['optim'] == o)]
         d2 = d2.drop_duplicates(['s', 'ee'])
         sns.tsplot(time='ee',value='f',data=d2,
@@ -197,7 +208,7 @@ def allcnn():
         plt.savefig('../fig/allcnn_loss.pdf', bbox_inches='tight')
 
 if opt['r']:
-    rough()
+    rough(dc, train=True)
     sys.exit(0)
 else:
     globals()[opt['m']]()
