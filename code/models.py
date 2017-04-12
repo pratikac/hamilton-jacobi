@@ -83,15 +83,15 @@ class rotlenet(nn.Module):
         def convpool(ci,co,ksz,psz,pstr,p):
             return nn.Sequential(
                 nn.Conv2d(ci,co,ksz),
+                nn.BatchNorm2d(co),
                 nn.ReLU(True),
                 nn.MaxPool2d(psz,stride=pstr),
-                nn.BatchNorm2d(co),
                 nn.Dropout(p))
         def conv(ci,co,ksz,p):
             return nn.Sequential(
                 nn.Conv2d(ci,co,ksz),
-                nn.ReLU(True),
                 nn.BatchNorm2d(co),
+                nn.ReLU(True),
                 nn.Dropout(p))
 
         self.m = nn.Sequential(
