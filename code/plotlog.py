@@ -54,11 +54,12 @@ dc['ee'] = dc['e']*dc['L']
 dc = dc.filter(items=['optim', 'f', 'ee', 'top1', 's','train','val'])
 
 # remove the diverging last few epochs for PME
-dc = dc.drop(dc[(dc.optim == 'PME') & (dc.ee > 150)].index)
+# dc = dc.drop(dc[(dc.optim == 'PME') & (dc.ee > 150)].index)
 
-#dc = dc[(dc.optim != 'HEAT') & (dc.optim != 'LL')]
+dc = dc[(dc.optim != 'PME') & (dc.optim != 'LL')]
 
-colors = dict(SGD='k',ESGD='r',HJB='b',FP='g',PME='m',HEAT='y',LL='c')
+colors = {'SGD':'k', 'ESGD':'r', 'H-ESGD':'b', 'HJ':'g', 'PME':'y', \
+        'HEAT':'m','LL':'c'}
 
 def rough(dc, train=False):
     d = dc.copy()
@@ -111,7 +112,7 @@ def mnistfc():
     plt.title('')
 
     plt.plot(range(200), 1.08*np.ones(200), 'k--', lw=1)
-    ax.text(50, 1.09, r'$1.08$\%', fontsize=fsz,
+    plt.text(50, 1.09, r'$1.08$\%', fontsize=fsz,
             verticalalignment='center', color='k')
     if opt['s']:
         plt.savefig('../fig/mnistfc_valid.pdf', bbox_inches='tight')
@@ -172,7 +173,7 @@ def allcnn():
 
     for o in sorted(colors.keys()):
         d = dc.copy()
-        if o == 'HEAT' or o == 'LL':
+        if o == 'LL' or o == 'PME':
             continue
 
         d2 = d[(d['train'] == True) & (d['optim'] == o)]
