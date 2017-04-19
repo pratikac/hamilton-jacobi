@@ -405,7 +405,7 @@ class FP(Optimizer):
         unflatten_params(model, w)
         mf,merr = closure()
 
-        return mf,merr
+            return mf,merr
 
 class PME(Optimizer):
     def __init__(self, params, config = {}):
