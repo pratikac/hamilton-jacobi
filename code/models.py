@@ -111,6 +111,44 @@ class rotlenet(nn.Module):
     def forward(self, x):
         return self.m(x)
 
+
+class tfnet(nn.Module):
+    def __init__(self, opt):
+        super(tfnet, self).__init__()
+        self.name = 'tfnet'
+        opt['l2'] = 1e-3
+        opt['d'] = 0.5
+
+        def convbn(ci,co,ksz,psz,p=0):
+            return nn.Sequential(
+                nn.Conv2d(ci,co,ksz),
+                nn.ReLU(True),
+                nn.MaxPool2d(psz,stride=psz),
+                nn.BatchNorm2d(co),
+                nn.Dropout(p))
+
+        c1, c2 = 64,128
+        self.m = nn.Sequential(
+            convbn(3,c1,5,3,opt['d']),
+            convbn(c1,c2,5,3,opt['d']),
+            View(c2*1*1),
+            nn.Linear(c2*1*1, 384),
+            nn.BatchNorm1d(384),
+            nn.ReLU(True),
+            nn.Dropout(opt['d']),
+            nn.Linear(384,192),
+            nn.BatchNorm1d(192),
+            nn.ReLU(True),
+            nn.Dropout(opt['d']),
+            nn.Linear(192,10))
+
+        s = '[%s] Num parameters: %d'%(self.name, num_parameters(self.m))
+        print(s)
+        logging.info(s)
+
+    def forward(self, x):
+        return self.m(x)
+
 class allcnn(nn.Module):
     def __init__(self, opt = {'d':0.5}, c1=96, c2= 192):
         super(allcnn, self).__init__()
