@@ -27,7 +27,7 @@ opt = add_args([
 ['--lr', 0.1, 'learning rate'],
 ['--lrs', '', 'learning rate schedule'],
 ['--l2', 0.0, 'ell-2'],
-['-d', 0.0, 'dropout'],
+['-d', -1.0, 'dropout'],
 ['-L', 0, 'sgld iterations'],
 ['--eps', 1e-4, 'sgld noise'],
 ['--g0', 1e-4, 'gamma'],

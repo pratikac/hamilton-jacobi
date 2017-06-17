@@ -1,4 +1,5 @@
 import torch as th
+import torchvision.cvtransforms as T
 from torchvision import datasets, transforms
 import torch.utils.data
 

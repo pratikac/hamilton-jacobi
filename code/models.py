@@ -154,7 +154,8 @@ class allcnn(nn.Module):
         super(allcnn, self).__init__()
         self.name = 'allcnn'
 
-        opt['d'] = 0.5
+        if opt['d'] < 0:
+            opt['d'] = 0.5
         opt['l2'] = 1e-3
 
         if opt['dataset'] == 'cifar10':
