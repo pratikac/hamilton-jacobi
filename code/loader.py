@@ -7,47 +7,55 @@ import os, sys, pdb, math, random
 import cv2
 
 class sampler_t:
-    def __init__(self, batch_size, x,y, train=True, augment=False):
+    def __init__(self, batch_size, x,y, train=True, augment=False,
+            frac=1.0, weights=None):
         self.n = x.size(0)
-        self.x, self.y = x,y
+        self.x, self.y = x.pin_memory(), y.pin_memory()
+        self.num_classes = np.unique(self.y.numpy()).max() + 1
+
+        if weights is None:
+            self.weights = th.Tensor(self.n).fill_(1).double()
+        else:
+            self.weights = weights.clone().double()
+
+        if train and frac < 1-1e-12:
+            idx = th.randperm(self.n)
+            self.x = th.index_select(self.x, 0, idx)
+            self.y = th.index_select(self.y, 0, idx)
+            self.n = int(self.n*frac)
+            self.x, self.y = self.x[:self.n], self.y[:self.n]
+
+            t1 = np.array(np.bincount(self.y.numpy(), minlength=self.num_classes))
+            self.weights = th.from_numpy(float(self.n)/t1[self.y.numpy()]).double()
+
         self.b = batch_size
-        self.idx = th.range(0, self.b-1).long()
+        self.idx = th.arange(0, self.b).long()
         self.train = train
         self.augment = augment
         self.sidx = 0
 
     def __next__(self):
         if self.train:
-            self.idx.random_(0,self.n-1)
+            self.idx.copy_(th.multinomial(self.weights, self.b, True))
 
             x,y  = th.index_select(self.x, 0, self.idx), \
                     th.index_select(self.y, 0, self.idx)
 
             if self.augment:
-                p = 4
-                r = np.random.randint(0, 1, self.b)
-                x = x.numpy().transpose(0,2,3,1)
+                x = x.numpy().astype(np.float32)
+                x = x.transpose(0,2,3,1)
                 sz = x.shape[1]
                 for i in xrange(self.b):
-                    if r[i] == 1:
-                        x[i] = np.fliplr(x[i])
-
-                    # pad using reflect to preserve color
-                    res = cv2.copyMakeBorder(x[i], p,p,p,p,
-                            borderType=cv2.BORDER_REFLECT, value=0)
-
-                    szx, szy = res.shape[:2]
-                    sz1, sz2 = random.randint(0, szx-sz), random.randint(0, szy-sz)
-                    res = res[sz1:sz1+sz, sz2:sz2+sz]
-                    res = res.reshape(x[i].shape)
-
+                    x[i] = T.RandomHorizontalFlip()(x[i])
+                    res = T.Pad(4, cv2.BORDER_REFLECT)(x[i])
+                    x[i] = T.RandomCrop(sz)(res)
                 x = x.transpose(0,3,1,2)
                 x = th.from_numpy(x)
         else:
             s = self.sidx
-            e = min(s+self.b-1, self.n-1)
+            e = min(s+self.b, self.n)
 
-            self.idx = th.range(s, e).long()
+            self.idx = th.arange(s, e).long()
             self.sidx += self.b
             if self.sidx >= self.n:
                 self.sidx = 0

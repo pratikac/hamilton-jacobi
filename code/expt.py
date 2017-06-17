@@ -8,7 +8,7 @@ import collections
 import pdb
 
 m = lenet({})
-m = nn.Sequential(nn.Linear(5,3,2))
+#m = nn.Sequential(nn.Linear(5,3,2))
 
 def flatten_params(model, flattened):
     flattened.zero_()

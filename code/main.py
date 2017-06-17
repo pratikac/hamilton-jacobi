@@ -210,6 +210,6 @@ if opt['validate'] == '':
         if e % opt['f'] == opt['f'] -1:
             val(e, val_loader)
         if opt['save']:
-            save(model, opt, marker='e_%s'%e)
+            save(model, opt, marker='s_%s'%opt['s'])
 else:
     val(e, test_loader)
