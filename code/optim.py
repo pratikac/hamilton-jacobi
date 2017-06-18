@@ -277,7 +277,7 @@ class FP(Optimizer):
 
         defaults = dict(lr=0.1, momentum=0, damp=0,
                  weight_decay=0, nesterov=True,
-                 L=100, g0=1e-2, g1=0,
+                 L=10, g0=1e-2, g1=0,
                  verbose=False,
                  backward=False)
 
