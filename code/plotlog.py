@@ -56,9 +56,9 @@ dc = dc.filter(items=['optim', 'f', 'ee', 'top1', 's','train','val'])
 # remove the diverging last few epochs for PME
 # dc = dc.drop(dc[(dc.optim == 'PME') & (dc.ee > 150)].index)
 
-dc = dc[(dc.optim != 'PME') & (dc.optim != 'LL')]
+dc = dc[(dc.optim != 'PME') & (dc.optim != 'LL') & (dc.optim != 'H-ESGD')]
 
-colors = {'SGD':'k', 'ESGD':'r', 'H-ESGD':'b', 'HJ':'g', 'PME':'y', \
+colors = {'SGD':'k', 'Entropy-SGD':'r', 'H-ESGD':'b', 'HJ':'g', 'PME':'y', \
         'HEAT':'m','LL':'c'}
 
 def rough(dc, train=False):
@@ -160,8 +160,8 @@ def allcnn():
     # plt.title(r'All-CNN: Validation error')
     plt.title('')
 
-    plt.plot(range(200), 7.82*np.ones(200), 'k--', lw=1)
-    plt.text(20, 8.25, r'$7.82$\%', fontsize=fsz,
+    plt.plot(range(200), 7.89*np.ones(200), 'k--', lw=1)
+    plt.text(20, 8.25, r'$7.89$\%', fontsize=fsz,
             verticalalignment='center', color='k')
 
     if opt['s']:
@@ -173,7 +173,7 @@ def allcnn():
 
     for o in sorted(colors.keys()):
         d = dc.copy()
-        if o == 'LL' or o == 'PME':
+        if o == 'LL' or o == 'PME' or o == 'H-ESGD':
             continue
 
         d2 = d[(d['train'] == True) & (d['optim'] == o)]
