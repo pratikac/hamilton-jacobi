@@ -136,31 +136,29 @@ def hj(u0, r0, a=(1,1), fp=opt['fp'], T=0.2, TFP=20, n=10):
 print '\n[HJ]'
 tsv, vs, rvs = hj(f, r0, (1,1), T=opt['thj'], TFP=opt['tfp'])
 
-print '\n[Burgers]'
-ts, nvs, rnvs = hj(f, r0, (0, 1),
-         T=opt['thjnv'], TFP=opt['tfp'])
+# print '\n[Burgers]'
+# ts, nvs, rnvs = hj(f, r0, (0, 1),
+#          T=opt['thjnv'], TFP=opt['tfp'])
 
-print '\n[SGD]'
-ts, sgds, rsgds = hj(f, r0, (1e-12, 1e-12),
-        T=opt['thj'], TFP=opt['tfp'], fp=0.2)
+# print '\n[SGD]'
+# ts, sgds, rsgds = hj(f, r0, (1e-12, 1e-12),
+#         T=opt['thj'], TFP=opt['tfp'], fp=0.2)
 
 plt.figure(1, figsize=(8,7))
 plt.clf()
-plt.plot(x,f,'k-',lw=1, label=r'$f(x)$')
+plt.plot(x,f,'k-',lw=2, label=r'$f(x)$')
 
-plt.fill_between(x, f, f+r0, color='grey', alpha='0.35')
-plt.fill_between(x, f, f+rsgds[-1]/4., color='grey', alpha='0.9')
+# plt.fill_between(x, f, f+r0, color='grey', alpha='0.35')
+# plt.fill_between(x, f, f+rsgds[-1]/4., color='grey', alpha='0.9')
 
-plt.plot(x, vs[-1],'indianred',lw=1.5, label=r'$u_{\textrm{viscous\ HJ}}(x,T)$')
-plt.fill_between(x, f, f+rvs[-1], color='indianred', alpha='0.75')
+plt.plot(x, vs[-1],'indianred',lw=2, label=r'$u_{\textrm{viscous\ HJ}}(x,T)$')
+# plt.fill_between(x, f, f+rvs[-1], color='indianred', alpha='0.75')
 
-plt.plot(x, nvs[-1],'royalblue',lw=1.5, label=r'$u_{\textrm{non-viscous\ HJ}}(x,T)$')
-plt.fill_between(x, f, f+rnvs[-1]/2.,
-       color='royalblue', alpha='0.75')
+# plt.plot(x, nvs[-1],'royalblue',lw=1.5, label=r'$u_{\textrm{non-viscous\ HJ}}(x,T)$')
+# plt.fill_between(x, f, f+rnvs[-1]/2.,
+#         color='royalblue', alpha='0.75')
 
 plt.xticks([])
 plt.yticks([])
-#plt.title(r'Viscous vs. non-viscous Hamilton-Jacobi equation smoothing')
-# plt.legend(loc='upper center')
 if opt['s']:
-    plt.savefig('../fig/smoothing.pdf', bbox_inches='tight')
+    plt.savefig('../fig/landscape.pdf', bbox_inches='tight')
